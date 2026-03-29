@@ -18,7 +18,7 @@ Required env vars:
     OPENAI_API_KEY   — OpenAI key or HF Inference API token (primary)
     HF_TOKEN         — Hugging Face token (fallback if no OPENAI_API_KEY)
     API_BASE_URL     — API endpoint (default: https://api.openai.com/v1)
-    MODEL_NAME       — Model to use (default: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8)
+    MODEL_NAME       — Model to use (default: meta-llama/Llama-3.3-70B-Instruct)
     OPENENV_BASE_URL — Environment server (default: http://localhost:8000)
 """
 from __future__ import annotations
@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 BASE_URL = os.getenv("OPENENV_BASE_URL", "http://127.0.0.1:8000")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 API_KEY = os.getenv("HF_TOKEN", "") or os.getenv("OPENAI_API_KEY", "")
-MODEL_NAME = os.getenv("MODEL_NAME", "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
+MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
 
 
 def verify_environment() -> bool:

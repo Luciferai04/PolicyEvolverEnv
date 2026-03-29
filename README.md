@@ -73,7 +73,7 @@ The environment includes a built-in testing script named `inference.py` ready fo
 Export your environment variables:
 ```bash
 export API_BASE_URL="https://api.openai.com/v1"
-export MODEL_NAME="nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+export MODEL_NAME="meta-llama/Llama-3.3-70B-Instruct"
 export HF_TOKEN="your_huggingface_or_openai_api_key_here"
 export OPENENV_BASE_URL="http://localhost:8000"
 ```
