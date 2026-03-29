@@ -27,7 +27,11 @@ async def health():
 
 @app.get("/")
 async def root():
-    return RedirectResponse(url="/docs")
+    return {
+        "status": "healthy", 
+        "message": "PolicyEvolverEnv is running perfectly. Please append /docs to your URL to view the interactive API.",
+        "endpoints": ["/health", "/tasks", "/step", "/reset", "/state", "/grader", "/baseline"]
+    }
 
 
 @app.get("/tasks")
