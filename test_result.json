@@ -1,0 +1,31 @@
+{
+  "baseline_scores": {
+    "task_easy": 0.0,
+    "task_medium": 0.0,
+    "task_hard": 0.0,
+    "overall_avg": 0.0
+  },
+  "mode": "llm",
+  "model": "meta-llama/Llama-3.3-70B-Instruct",
+  "runtime_seconds": 0.01,
+  "detail": [
+    {
+      "task_id": "task_easy",
+      "reward": 0.0,
+      "mode": "error",
+      "error": "All connection attempts failed"
+    },
+    {
+      "task_id": "task_medium",
+      "reward": 0.0,
+      "mode": "error",
+      "error": "All connection attempts failed"
+    },
+    {
+      "task_id": "task_hard",
+      "reward": 0.0,
+      "mode": "error",
+      "error": "All connection attempts failed"
+    }
+  ]
+}

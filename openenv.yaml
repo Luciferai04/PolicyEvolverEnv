@@ -1,0 +1,77 @@
+name: "PolicyEvolverEnv"
+description: "Policy Design and Evolution Sandbox — agents learn to evolve real-world governance frameworks through meta-reasoning"
+version: "1.0.0"
+author: "PolicyEvolution Team"
+tags:
+  - "policy"
+  - "governance"
+  - "meta-reasoning"
+  - "content-moderation"
+  - "AI-safety"
+
+environment:
+  module: "policy_evolver_env.server.environment"
+  class: "PolicyEvolverEnvironment"
+
+  observation_schema:
+    type: "object"
+    description: "Policy context, data corpus, and system state"
+
+  action_schema:
+    type: "object"
+    description: "Discriminated union on action_type field"
+    discriminator: "action_type"
+    variants:
+      - action_type: "propose_clarification"
+        schema: "ProposeClarificationAction"
+      - action_type: "propose_new_rule"
+        schema: "ProposeNewRuleAction"
+      - action_type: "evolve_policy"
+        schema: "EvolveProcessAction"
+
+  reward_range: [0.0, 1.0]
+
+runtime:
+  max_steps: 5
+  timeout_seconds: 1200
+  vcpu: 2
+  memory_gb: 8
+
+tasks:
+  - id: "task_easy"
+    difficulty: "easy"
+    description: "Identify and clarify ambiguous policy terms in a social media community guidelines"
+    expected_min_score: 0.70
+
+  - id: "task_medium"
+    difficulty: "medium"
+    description: "Detect policy gaps in corporate HR policies and propose new rules for emerging scenarios"
+    expected_min_score: 0.55
+
+  - id: "task_hard"
+    difficulty: "hard"
+    description: "Holistically evolve an e-commerce Trust & Safety framework with trade-off reasoning"
+    expected_min_score: 0.40
+
+grading:
+  module: "policy_evolver_env.server.grader"
+  function: "grade"
+  return_range: [0.0, 1.0]
+
+endpoints:
+  required:
+    - path: "/reset"
+      method: "POST"
+    - path: "/step"
+      method: "POST"
+    - path: "/state"
+      method: "GET"
+    - path: "/tasks"
+      method: "GET"
+    - path: "/grader"
+      method: "GET"
+    - path: "/baseline"
+      method: "GET"
+  optional:
+    - path: "/health"
+      method: "GET"

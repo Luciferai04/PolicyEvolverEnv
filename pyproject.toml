@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "policy-evolver-env"
+version = "1.0.0"
+description = "PolicyEvolverEnv — OpenEnv RL environment for policy evolution through meta-reasoning"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "openenv-core>=0.1.0",
+    "pydantic>=2.9.2",
+    "pydantic-settings>=2.6.1",
+    "fastapi>=0.115.4",
+    "uvicorn>=0.32.0",
+    "scikit-learn>=1.5.2",
+    "numpy>=1.26.4",
+    "openai>=1.54.4",
+    "httpx>=0.27.0",
+    "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "httpx"]
+
+[tool.setuptools.packages.find]
+include = ["policy_evolver_env*"]
