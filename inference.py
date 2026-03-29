@@ -271,8 +271,8 @@ async def run_direct_baseline() -> Dict:
     Run baseline directly using environment and grader imports.
     Used by the /baseline endpoint to avoid self-HTTP calls on HF Spaces.
     """
-    from ..server.environment import PolicyEvolverEnvironment
-    from ..server.grader import grade
+    from server.environment import PolicyEvolverEnvironment
+    from server.grader import grade
 
     env = PolicyEvolverEnvironment()
     use_llm = verify_environment()

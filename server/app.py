@@ -3,13 +3,13 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 from openenv.core.env_server import create_fastapi_app
-from ..models import (
+from models import (
     ProposeClarificationAction, ProposeNewRuleAction, EvolveProcessAction,
     Observation, Action
 )
-from .environment import PolicyEvolverEnvironment
-from .grader import grade
-from .tasks import TASK_REGISTRY
+from server.environment import PolicyEvolverEnvironment
+from server.grader import grade
+from server.tasks import TASK_REGISTRY
 import json
 
 # Create app via OpenEnv helper — pass factory callable, action/obs classes
@@ -58,6 +58,6 @@ async def run_baseline_endpoint():
     Runs the LLM baseline (or rule-based fallback) and returns scores for all tasks.
     Uses the grader directly instead of HTTP calls to self.
     """
-    from ..inference import run_direct_baseline
+    from inference import run_direct_baseline
     results = await run_direct_baseline()
     return results

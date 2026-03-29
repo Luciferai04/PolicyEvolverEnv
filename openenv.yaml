@@ -10,7 +10,7 @@ tags:
   - "AI-safety"
 
 environment:
-  module: "policy_evolver_env.server.environment"
+  module: "server.environment"
   class: "PolicyEvolverEnvironment"
 
   observation_schema:

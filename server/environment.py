@@ -4,12 +4,12 @@ import uuid
 import random
 from typing import Optional, Any, Dict
 from openenv.core.env_server import Environment
-from ..models import (
+from models import (
     Action, Observation, State,
     ProposeClarificationAction, ProposeNewRuleAction, EvolveProcessAction,
 )
-from .grader import grade
-from .tasks import TASK_REGISTRY
+from server.grader import grade
+from server.tasks import TASK_REGISTRY
 
 
 class PolicyEvolverEnvironment(Environment[Action, Observation, State]):

@@ -6,11 +6,11 @@ All functions return float in [0.0, 1.0].
 from __future__ import annotations
 import re
 from typing import Dict, List, Any
-from ..models import (
+from models import (
     ProposeClarificationAction, ProposeNewRuleAction, EvolveProcessAction,
     Observation
 )
-from .tasks import TASK_REGISTRY
+from server.tasks import TASK_REGISTRY
 
 
 # ─────────────────────────────────────────────
