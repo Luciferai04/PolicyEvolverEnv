@@ -2,6 +2,7 @@
 from __future__ import annotations
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse, RedirectResponse
+import uvicorn
 from openenv.core.env_server import create_fastapi_app
 from models import (
     ProposeClarificationAction, ProposeNewRuleAction, EvolveProcessAction,
@@ -70,3 +71,11 @@ async def run_baseline_endpoint():
     from inference import run_direct_baseline
     results = await run_direct_baseline()
     return results
+
+
+def main():
+    """Entry point for the OpenEnv multi-mode deployment grader."""
+    uvicorn.run("server.app:app", host="0.0.0.0", port=8000, reload=False)
+
+if __name__ == "__main__":
+    main()

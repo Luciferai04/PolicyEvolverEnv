@@ -26,3 +26,6 @@ dev = ["pytest", "pytest-asyncio", "httpx"]
 
 [tool.setuptools.packages.find]
 include = ["policy_evolver_env*"]
+
+[project.scripts]
+server = "server.app:main"
