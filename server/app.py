@@ -1,7 +1,7 @@
 # server/app.py
 from __future__ import annotations
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from openenv.core.env_server import create_fastapi_app
 from models import (
     ProposeClarificationAction, ProposeNewRuleAction, EvolveProcessAction,
@@ -23,6 +23,11 @@ app = create_fastapi_app(
 @app.get("/health")
 async def health():
     return {"status": "healthy", "environment": "PolicyEvolverEnv", "version": "1.0.0"}
+
+
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/tasks")
