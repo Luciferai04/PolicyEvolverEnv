@@ -1,4 +1,5 @@
 # server/app.py
+# Trigger HF rebuild due to platform error
 from __future__ import annotations
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse, RedirectResponse
