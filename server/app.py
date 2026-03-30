@@ -35,6 +35,22 @@ async def root():
     }
 
 
+@app.get("/web")
+async def web():
+    """HF Spaces pings this path to confirm the Docker app is alive."""
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse("""
+    <html><head><title>PolicyEvolverEnv</title></head>
+    <body style="font-family:system-ui;background:#0d1117;color:#c9d1d9;display:flex;justify-content:center;align-items:center;height:100vh;margin:0">
+    <div style="text-align:center;max-width:600px">
+        <h1 style="color:#58a6ff">PolicyEvolverEnv</h1>
+        <p>RL environment for policy evolution through meta-reasoning</p>
+        <p style="margin-top:20px"><a href="/docs" style="color:#58a6ff;text-decoration:none;border:1px solid #58a6ff;padding:8px 16px;border-radius:6px">Open API Docs →</a></p>
+        <p style="color:#8b949e;font-size:0.85em;margin-top:30px">Endpoints: /reset · /step · /state · /health · /tasks · /baseline</p>
+    </div></body></html>
+    """)
+
+
 @app.get("/tasks")
 async def list_tasks():
     return [
