@@ -3,7 +3,7 @@ title: PolicyEvolverEnv
 colorFrom: blue
 colorTo: indigo
 sdk: docker
-app_port: 8000
+app_port: 7860
 ---
 # PolicyEvolverEnv
 
@@ -62,7 +62,7 @@ pip install -r server/requirements.txt
 ### 2. Run the Environment API
 Start the FastAPI environment server locally:
 ```bash
-uvicorn server.app:app --port 8000
+uvicorn server.app:app --port 7860
 ```
 This boots all core endpoint paths (`/reset`, `/step`, `/state`, `/tasks`, `/grader`, `/health`).
 
@@ -74,7 +74,7 @@ Export your environment variables:
 export API_BASE_URL="https://api.openai.com/v1"
 export MODEL_NAME="meta-llama/Llama-3.3-70B-Instruct"
 export HF_TOKEN="your_huggingface_or_openai_api_key_here"
-export OPENENV_BASE_URL="http://localhost:8000"
+export OPENENV_BASE_URL="http://localhost:7860"
 ```
 
 Execute the agent simulation against the running environment:
