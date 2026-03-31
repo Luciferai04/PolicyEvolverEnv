@@ -38,6 +38,10 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal Error", "message": str(exc), "traceback": traceback.format_exc()},
     )
 
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/dashboard/")
+
 # ───────────────────────────────────────────────────────────────────────────
 # Custom Professional "Judge Ready" Gradio Dashboard
 # ───────────────────────────────────────────────────────────────────────────
@@ -221,7 +225,7 @@ def build_custom_ui():
 
 if os.getenv("ENABLE_WEB_INTERFACE", "false").lower() == "true":
     custom_demo = build_custom_ui()
-    app = gr.mount_gradio_app(app, custom_demo, path="/")
+    app = gr.mount_gradio_app(app, custom_demo, path="/dashboard/")
 
 def main():
     uvicorn.run("server.app:app", host="0.0.0.0", port=8000, reload=False)
