@@ -223,11 +223,12 @@ def build_custom_ui():
 
     return demo
 
-if os.getenv("ENABLE_WEB_INTERFACE", "false").lower() == "true":
-    custom_demo = build_custom_ui()
-    app = gr.mount_gradio_app(app, custom_demo, path="/dashboard/")
+# Enable the professional "Judge Ready" console by default
+custom_demo = build_custom_ui()
+app = gr.mount_gradio_app(app, custom_demo, path="/dashboard/")
 
 def main():
+    # Sync with Hugging Face and local requirements
     uvicorn.run("server.app:app", host="0.0.0.0", port=7860, reload=False)
 
 if __name__ == "__main__":
