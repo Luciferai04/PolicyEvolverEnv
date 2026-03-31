@@ -4,6 +4,7 @@ colorFrom: blue
 colorTo: indigo
 sdk: docker
 app_port: 7860
+# HF_BUILD_TRIGGER: 2026-03-31T11:15:00Z
 ---
 # PolicyEvolverEnv
 
