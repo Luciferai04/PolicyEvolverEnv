@@ -1,7 +1,6 @@
-# models.py
 from __future__ import annotations
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Literal, Union
+from typing import Optional, List, Dict, Literal, Union, Annotated
+from pydantic import BaseModel, Field, Discriminator, RootModel
 from enum import Enum
 import uuid
 
@@ -50,10 +49,11 @@ class EvolveProcessAction(BaseModel):
     think: Optional[str] = Field(default=None, description="Chain-of-thought reasoning (earns +0.1 bonus)")
 
 
-from pydantic import RootModel
-
 class Action(RootModel):
-    root: Union[ProposeClarificationAction, ProposeNewRuleAction, EvolveProcessAction] = Field(..., discriminator="action_type")
+    root: Annotated[
+        Union[ProposeClarificationAction, ProposeNewRuleAction, EvolveProcessAction],
+        Discriminator("action_type")
+    ]
 
 
 class Observation(BaseModel):

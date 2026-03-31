@@ -1,4 +1,5 @@
 # server/environment.py
+# HF Force Rebuild: 2026-03-30T17:16:00Z
 from __future__ import annotations
 import uuid
 import random
@@ -31,6 +32,7 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
         super().__init__()
         self._state = State()
         self._current_task = None
+        self._persistent_best_score = 0.0
         self._initialized = True
 
     def reset(
@@ -51,7 +53,7 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
             step_count=0,
             max_steps=5,
             current_score=0.0,
-            best_score=0.0,
+            best_score=self._persistent_best_score,
             actions_taken=[],
         )
 
@@ -66,7 +68,12 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
             identified_issues=task.get("identified_issues", []),
             reward=0.0,
             done=False,
-            info={"task_description": task["description"], "difficulty": task["difficulty"]},
+            info={
+                "task_description": task["description"], 
+                "difficulty": task["difficulty"],
+                "best_score": self._persistent_best_score,
+                "steps_remaining": 5
+            },
         )
 
     def step(
@@ -84,11 +91,15 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
         if isinstance(action, dict):
             action_dict = action
         else:
+            # Handle Pydantic RootModel used for discriminated unions
+            if hasattr(action, "root"):
+                action = action.root
             action_dict = action.model_dump() if hasattr(action, "model_dump") else dict(action)
 
         reward = grade(action_dict, self._state.task_id)
         self._state.current_score = reward
         self._state.best_score = max(self._state.best_score, reward)
+        self._persistent_best_score = max(self._persistent_best_score, reward)
 
         action_type = action_dict.get("action_type", "unknown") if isinstance(action_dict, dict) else "unknown"
         self._state.actions_taken.append(action_type)
