@@ -54,7 +54,7 @@ tasks:
     expected_min_score: 0.40
 
 grading:
-  module: "policy_evolver_env.server.grader"
+  module: "server.grader"
   function: "grade"
   return_range: [0.0, 1.0]
 
