@@ -228,7 +228,7 @@ if os.getenv("ENABLE_WEB_INTERFACE", "false").lower() == "true":
     app = gr.mount_gradio_app(app, custom_demo, path="/dashboard/")
 
 def main():
-    uvicorn.run("server.app:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("server.app:app", host="0.0.0.0", port=7860, reload=False)
 
 if __name__ == "__main__":
     main()
