@@ -19,6 +19,7 @@ class ProposeClarificationAction(BaseModel):
     affected_policy_ids: List[str] = Field(default_factory=list, description="Policy IDs this affects")
     justification: str = Field(description="Why this term is ambiguous")
     think: Optional[str] = Field(default=None, description="Chain-of-thought reasoning (earns +0.1 bonus)")
+    model_config = {"extra": "allow"}
 
 
 class ProposeNewRuleAction(BaseModel):
@@ -30,6 +31,7 @@ class ProposeNewRuleAction(BaseModel):
     integration_points: List[str] = Field(default_factory=list, description="How it connects to existing policies")
     justification: str = Field(description="Why a gap exists and why this rule fills it")
     think: Optional[str] = Field(default=None, description="Chain-of-thought reasoning (earns +0.1 bonus)")
+    model_config = {"extra": "allow"}
 
 
 class PolicyModification(BaseModel):
@@ -47,6 +49,7 @@ class EvolveProcessAction(BaseModel):
     rollback_conditions: List[str] = Field(default_factory=list, description="When to revert")
     justification: str = Field(description="Comprehensive reasoning")
     think: Optional[str] = Field(default=None, description="Chain-of-thought reasoning (earns +0.1 bonus)")
+    model_config = {"extra": "allow"}
 
 
 class Action(RootModel):
@@ -56,12 +59,29 @@ class Action(RootModel):
     ]
 
 
+class TaskInfo(BaseModel):
+    """Returned by /tasks endpoint."""
+    task_id: str
+    difficulty: str
+    description: str
+    action_schema: dict
+
+
+class CorpusIncident(BaseModel):
+    id: str
+    content: str
+    system_action: str = "pending"
+    model_config = {"extra": "allow"}
+
+
 class Observation(BaseModel):
     """What the agent sees after reset() or step()."""
     task_id: str
     episode_id: str
     step_count: int
-    data_corpus: List[Dict] = Field(description="Scenarios/posts/actions for the agent to analyze")
+    corpus_size: int = 0
+    corpus_shown: int = 0
+    data_corpus: List[CorpusIncident] = Field(description="Scenarios/posts/actions for the agent to analyze")
     current_policies: List[Dict] = Field(description="The existing policy set")
     policy_outcomes: Optional[List[Dict]] = Field(default=None, description="Historical outcome data (hard task)")
     system_metrics: Dict[str, float] = Field(default_factory=dict)

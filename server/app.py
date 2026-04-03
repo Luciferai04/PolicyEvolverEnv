@@ -13,18 +13,22 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from openenv.core.env_server import create_fastapi_app
 from models import (
     ProposeClarificationAction, ProposeNewRuleAction, EvolveProcessAction,
-    Observation, Action, PolicyActionType
+    Observation, Action, PolicyActionType, TaskInfo
 )
 from server.environment import PolicyEvolverEnvironment
 from server.grader import grade
 from server.tasks import TASK_REGISTRY
 
-# Initialize FastAPI app
+# Initialize Environment and FastAPI app
+env = PolicyEvolverEnvironment()
 app = create_fastapi_app(
     env=PolicyEvolverEnvironment,
     action_cls=Action,
     observation_cls=Observation,
 )
+
+# Remove default routes to avoid collision with custom overrides below
+app.router.routes = [r for r in app.router.routes if r.path not in ["/health", "/state", "/tasks", "/grader", "/baseline"]]
 
 # Custom Exception Handlers
 @app.exception_handler(RequestValidationError)
@@ -40,7 +44,82 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/")
 async def root():
-    return RedirectResponse(url="/dashboard/")
+    """Root endpoint for automated pings to return 200 OK."""
+    return {"message": "PolicyEvolverEnv is running", "status": "ok"}
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
+@app.get("/state")
+def get_state():
+    """Return the current environment state."""
+    return {
+        "episode_id": env.state.episode_id,
+        "step_count": env.state.step_count,
+        "max_steps": env.state.max_steps,
+        "current_score": env.state.current_score
+    }
+
+
+@app.get("/tasks")
+def list_tasks() -> list[TaskInfo]:
+    """Return all tasks with their action schema."""
+    return [
+        TaskInfo(
+            task_id=tid,
+            difficulty=task["difficulty"],
+            description=task["description"],
+            action_schema=Action.model_json_schema(),
+        )
+        for tid, task in TASK_REGISTRY.items()
+    ]
+
+
+@app.post("/grader")
+def get_grader_score(task_id: str, action: dict):
+    """
+    Grade a submission directly.
+    """
+    if task_id not in TASK_REGISTRY:
+        raise HTTPException(status_code=404, detail=f"Unknown task_id: {task_id}")
+    
+    score = grade(action, task_id)
+    return {
+        "task_id": task_id,
+        "score": score,
+        "passed": 1 if score > 0.5 else 0, # Hackathon-appropriate proxy
+        "total": 1
+    }
+
+
+@app.get("/baseline")
+def run_baseline_route():
+    """
+    Run the baseline agent on all tasks and return scores.
+    """
+    import subprocess, sys, os
+    try:
+        # Inherit required env vars
+        env_vars = os.environ.copy()
+        # Fix A: Call root-level inference.py
+        result = subprocess.run(
+            [sys.executable, "inference.py", "--output", "json"],
+            capture_output=True, 
+            text=True, 
+            timeout=180,
+            env=env_vars
+        )
+        raw = json.loads(result.stdout)
+        # Map to required structure: {"baseline_results": [...], "average_score": float, "model": ...}
+        return {
+            "baseline_results": raw.get("detail", []),
+            "average_score": raw.get("baseline_scores", {}).get("overall_avg", 0.0),
+            "model": raw.get("model", "llama-3.3-70b-versatile")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ───────────────────────────────────────────────────────────────────────────
 # Custom Professional "Judge Ready" Gradio Dashboard
@@ -56,14 +135,16 @@ def build_custom_ui():
         # 1. Data Corpus Table (Dynamic Handling)
         corpus_data = []
         for item in obs.get("data_corpus", []):
-            content = item.get("text") or item.get("type", "N/A") 
+            content = item.get("content") or item.get("text") or item.get("type", "N/A") 
             if "flags" in item:
                 content += f" | Tags: {', '.join(item['flags'])}"
+            if "desc" in item:
+                content += f" | Info: {item['desc']}"
             
             corpus_data.append({
                 "ID": item.get("id"),
                 "Content": content[:120] + ("..." if len(content) > 120 else ""),
-                "System Action": item.get("action_taken") or item.get("outcome", "pending")
+                "System Action": item.get("system_action") or item.get("action_taken") or item.get("outcome", "pending")
             })
         df_corpus = pd.DataFrame(corpus_data) if corpus_data else pd.DataFrame(columns=["ID", "Content", "System Action"])
 
@@ -77,13 +158,17 @@ def build_custom_ui():
         steps_left = obs.get("info", {}).get("steps_remaining", 5)
         episode_id = obs.get("episode_id", "N/A")[:8]
         
-        return df_corpus, policy_md, best_score, steps_left, episode_id
+        shown = obs.get("corpus_shown", len(corpus_data))
+        total = obs.get("corpus_size", len(corpus_data))
+        corpus_stat = f"### 📊 Corpus: **{shown}** of **{total}** incidents displayed"
+        
+        return df_corpus, policy_md, best_score, steps_left, episode_id, corpus_stat
 
     def handle_reset(task_id):
         obs = env.reset(task_id=task_id).model_dump()
-        df, pol, score, steps, ep = format_obs(obs)
+        df, pol, score, steps, ep, stat = format_obs(obs)
         reward_msg = "### 🏁 Scenario Initialized\nReview the Data Corpus and Active Framework to identify gaps."
-        return df, pol, score, steps, ep, reward_msg, json.dumps(obs, indent=2)
+        return df, pol, score, steps, ep, stat, reward_msg, json.dumps(obs, indent=2)
 
     def handle_step(task_id, action_type, easy_term, easy_def, easy_just, easy_think,
                     med_domain, med_rule, med_scope, med_just, med_think,
@@ -100,17 +185,21 @@ def build_custom_ui():
             validated_action = Action.model_validate(payload)
             obs_obj = env.step(validated_action)
             obs = obs_obj.model_dump()
-            df, pol, score, steps, ep = format_obs(obs)
+            df, pol, score, steps, ep, stat = format_obs(obs)
             
             reward = obs.get("reward", 0.0)
             color = "green" if reward > 0 else "orange" if reward == 0 else "red"
             reward_msg = f"### <span style='color:{color}'>Latest Strategic Reward: {reward}</span>\nCurrent Project Score: {score}"
             
-            return df, pol, score, steps, ep, reward_msg, json.dumps(obs, indent=2)
+            return df, pol, score, steps, ep, stat, reward_msg, json.dumps(obs, indent=2)
         except Exception as e:
-            return pd.DataFrame(), f"### Execution Error\n{str(e)}", 0, 0, "ERROR", f"Traceback:\n{traceback.format_exc()}", "{}"
+            return pd.DataFrame(), f"### Execution Error\n{str(e)}", 0, 0, "ERROR", "### ERROR", f"Traceback:\n{traceback.format_exc()}", "{}"
 
-    with gr.Blocks(title="PolicyEvolver Judge Console", theme=gr.themes.Default(primary_hue="blue")) as demo:
+    with gr.Blocks(
+        title="PolicyEvolver Judge Console", 
+        theme=gr.themes.Default(primary_hue="blue"),
+        css=".progress-badge { display: none !important; }"
+    ) as demo:
         gr.HTML("<h1 style='text-align: center; color: #2D5A27;'>PolicyEvolver: Judge's Strategic Console</h1>")
         gr.Markdown("Welcome, Judge Agent. Use this console to identify data-to-policy gaps and propose measurable governance refinements.")
 
@@ -129,6 +218,7 @@ def build_custom_ui():
 
             # RIGHT: Observations & Data Corpus
             with gr.Column(scale=3):
+                corpus_count_disp = gr.Markdown("### 📊 Corpus: 0 of 0 incidents displayed")
                 with gr.Tabs():
                     with gr.Tab("📋 Data Corpus (Tabular View)"):
                         corpus_table = gr.DataFrame(label="Sampled Posts and System Actions", interactive=False)
@@ -178,7 +268,15 @@ def build_custom_ui():
                         med_just = gr.TextArea(label="Evidence of Coverage Gap", placeholder="Evidence for why this rule is needed...")
                         med_think = gr.Textbox(label="Agent Reasoning (CoT)", placeholder="Explain your logic...")
 
-                        def load_med():
+                        def load_med(task_id):
+                            if task_id == "task_hard":
+                                return (
+                                    "seller_legitimacy",
+                                    "Sellers with fewer than 30 days of history and more than 20 sales per day must complete enhanced identity verification before withdrawals are processed.",
+                                    "marketplace, fraud, seller_onboarding, payments",
+                                    "Cases h_leg_001 and h_leg_005 show that rapid sales velocity combined with zero return history is a known fraud pattern not covered by current policies.",
+                                    "The corpus shows multiple high-velocity new seller patterns. The gap is the absence of velocity-based verification triggers in the onboarding policy."
+                                )
                             return (
                                 "AI_use",
                                 "Employees must explicitly disclose any use of generative AI tools when drafting client proposals or proprietary code. This requirement is mandatory and will be monitored through manual reviews.",
@@ -186,7 +284,7 @@ def build_custom_ui():
                                 "Current policies like pol_hr_001 handle general confidentiality but do not account for data privacy risks specifically associated with external AI training sets.",
                                 "I am bridging the gap between general confidentiality and AI usage. By introducing mandatory disclosure, we mitigate the risk of proprietary data leakages."
                             )
-                        load_med_btn.click(load_med, outputs=[med_domain, med_rule, med_scope, med_just, med_think])
+                        load_med_btn.click(load_med, inputs=[task_id], outputs=[med_domain, med_rule, med_scope, med_just, med_think])
 
                     with gr.Tab("Hard: Full System Evolution"):
                         gr.Markdown("*Manually modify the underlying framework logic.*")
@@ -209,7 +307,44 @@ def build_custom_ui():
                 step_btn = gr.Button("Execute Strategic Step", variant="primary")
 
         # Logic
-        reset_btn.click(handle_reset, inputs=[task_id], outputs=[corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, reward_outcome_disp, raw_json_box])
+        def sync_from_mode(mode):
+            t_id = "task_easy"
+            if mode == "propose_new_rule": t_id = "task_medium"
+            elif mode == "evolve_policy": t_id = "task_hard"
+            
+            # Perform reset with the new task_id
+            res = handle_reset(t_id)
+            return (t_id,) + res
+
+        def sync_from_tab(evt: gr.SelectData):
+            t_id = "task_easy"
+            mode = "propose_clarification"
+            if evt.index == 1: 
+                t_id = "task_medium"
+                mode = "propose_new_rule"
+            elif evt.index == 2: 
+                t_id = "task_hard"
+                mode = "evolve_policy"
+            
+            res = handle_reset(t_id)
+            return (t_id, mode) + res
+
+        # Event Listeners
+        reset_btn.click(handle_reset, inputs=[task_id], outputs=[corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_outcome_disp, raw_json_box])
+        
+        # Automatic Sync: Radio -> Dropdown & Initialize
+        action_mode.change(
+            sync_from_mode, 
+            inputs=[action_mode], 
+            outputs=[task_id, corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_outcome_disp, raw_json_box]
+        )
+        
+        # Automatic Sync: Tab -> Dropdown & Radio & Initialize
+        action_tabs.select(
+            sync_from_tab,
+            outputs=[task_id, action_mode, corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_outcome_disp, raw_json_box]
+        )
+
         step_btn.click(
             handle_step,
             inputs=[
@@ -218,7 +353,7 @@ def build_custom_ui():
                 med_domain, med_rule, med_scope, med_just, med_think,
                 hard_mods, hard_outcomes, hard_just, hard_think
             ],
-            outputs=[corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, reward_outcome_disp, raw_json_box]
+            outputs=[corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_outcome_disp, raw_json_box]
         )
 
     return demo

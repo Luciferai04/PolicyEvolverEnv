@@ -33,6 +33,7 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
         self._state = State()
         self._current_task = None
         self._persistent_best_score = 0.0
+        self._seen_action_hashes = set()
         self._initialized = True
 
     def reset(
@@ -45,6 +46,7 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
         if task_id is None:
             task_id = random.choice(list(TASK_REGISTRY.keys()))
 
+        self._seen_action_hashes = set()
         task = TASK_REGISTRY[task_id]
         self._current_task = task
         self._state = State(
@@ -57,11 +59,25 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
             actions_taken=[],
         )
 
+        # Deepcopy to keep episode state
+        import copy
+        self._episode_corpus = copy.deepcopy(task.get("data_corpus", []))
+        # Ensure all incidents follow CorpusIncident schema properly
+        for item in self._episode_corpus:
+            if "content" not in item:
+                item["content"] = item.pop("text", None) or item.pop("desc", None) or str(item.get("flags", ""))
+            if "system_action" not in item:
+                item["system_action"] = "pending"
+
+        shown_corpus = self._episode_corpus[:10]
+
         return Observation(
             task_id=task_id,
             episode_id=self._state.episode_id,
             step_count=0,
-            data_corpus=task["data_corpus"],
+            corpus_size=len(self._episode_corpus),
+            corpus_shown=len(shown_corpus),
+            data_corpus=shown_corpus,
             current_policies=task["current_policies"],
             policy_outcomes=task.get("policy_outcomes"),
             system_metrics=task.get("system_metrics", {}),
@@ -72,7 +88,7 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
                 "task_description": task["description"], 
                 "difficulty": task["difficulty"],
                 "best_score": self._persistent_best_score,
-                "steps_remaining": 5
+                "steps_remaining": self._state.max_steps
             },
         )
 
@@ -96,13 +112,50 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
                 action = action.root
             action_dict = action.model_dump() if hasattr(action, "model_dump") else dict(action)
 
-        reward = grade(action_dict, self._state.task_id)
+        # Repetition Penalty logic
+        import json as _json
+        try:
+            action_hash = hash(_json.dumps(action_dict, sort_keys=True, default=str))
+        except Exception:
+            action_hash = hash(str(action_dict))
+
+        if action_hash in self._seen_action_hashes:
+            repetition_penalty = 0.30
+        else:
+            repetition_penalty = 0.0
+            self._seen_action_hashes.add(action_hash)
+
+        previous_score = self._state.current_score
+        raw_reward = grade(action_dict, self._state.task_id, previous_score=previous_score)
+        reward = max(0.0, raw_reward - repetition_penalty)
+        
         self._state.current_score = reward
         self._state.best_score = max(self._state.best_score, reward)
         self._persistent_best_score = max(self._persistent_best_score, reward)
 
         action_type = action_dict.get("action_type", "unknown") if isinstance(action_dict, dict) else "unknown"
         self._state.actions_taken.append(action_type)
+
+        # Fix 2: Stateful Corpus Updates Based on Score
+        target_term = action_dict.get("ambiguous_term") or action_dict.get("rule_domain") or ""
+        for item in self._episode_corpus:
+            # For this hackathon, we apply state changes based on generic keyword matching or domain handling
+            # If target_term is in the content or properties, we update. 
+            # Alternatively, if hard task, update broadly.
+            c_type = str(item.get("type", "")).lower()
+            c_text = str(item.get("content", "")).lower()
+            t_term = str(target_term).lower()
+            
+            # Simple heuristic mapping
+            if t_term in c_text or t_term in c_type or action_type == "evolve_policy":
+                if reward >= 0.7:
+                    item["system_action"] = "policy_applied"
+                elif 0.3 <= reward < 0.7:
+                    item["system_action"] = "flagged"
+                elif reward < 0.3:
+                    pass # leave as pending
+        
+        shown_corpus = self._episode_corpus[:10]
 
         done = (
             reward >= 0.90 or
@@ -113,7 +166,9 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
             task_id=self._state.task_id,
             episode_id=self._state.episode_id,
             step_count=self._state.step_count,
-            data_corpus=self._current_task["data_corpus"],
+            corpus_size=len(self._episode_corpus),
+            corpus_shown=len(shown_corpus),
+            data_corpus=shown_corpus,
             current_policies=self._current_task["current_policies"],
             policy_outcomes=self._current_task.get("policy_outcomes"),
             system_metrics=self._current_task.get("system_metrics", {}),
@@ -122,6 +177,8 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
             done=done,
             info={
                 "best_score": self._state.best_score,
+                "last_reward": reward,
+                "action_history": self._state.actions_taken,
                 "steps_remaining": self._state.max_steps - self._state.step_count,
             },
         )

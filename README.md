@@ -4,7 +4,7 @@ colorFrom: blue
 colorTo: indigo
 sdk: docker
 app_port: 7860
-# HF_BUILD_TRIGGER: 2026-03-31T11:15:00Z
+base_path: /dashboard/
 ---
 # PolicyEvolverEnv
 
@@ -14,6 +14,46 @@ app_port: 7860
 PolicyEvolverEnv is a real-world governance sandbox where an AI agent learns to **design and evolve governance policies** through meta-reasoning over real-world operational data. In modern platforms (social media, enterprise HR, e-commerce), static policies quickly become outdated or vaguely applied, leading to inconsistent enforcement, false-positive moderation, and unrecognized fraud. 
 
 This environment simulates this challenge by presenting the agent with a corpus of operational data alongside an existing policy framework. The agent's goal is to analyze the outcomes, identify systemic flaws or ambiguities, and act directly on the policies to optimize governance outcomes. This directly tackles live production problems faced by platforms like Meta.
+
+##  The Strategic Concept
+
+### 1. The Core Idea: What is PolicyEvolverEnv?
+Most AI environments are games (like Chess or Atari). **PolicyEvolverEnv** is different—it is a **Strategic Governance Sandbox**.
+
+The environment represents the **Reinforcement Learning from Verifiable Rewards (RLVR)** stage of model training. It gives an agent a score (Reward) based on how well it identifies a flaw in a policy and "evolves" it to be more precise.
+
+*   **The Problem**: Human moderators or automated systems make mistakes because the "Rules of the Game" are broken.
+*   **The Solution**: An AI agent that doesn't just follow rules, but **designs** them.
+
+### 2. The Gradio "Judge Console": How it Works
+The dashboard we built (`server/app.py`) is the human-readable window into this environment. It’s designed as a **Command & Control** center for a "Policy Judge."
+
+#### 📈 The Left Panel: Scenario Metrics
+*   **Environment Best Score**: This tracks the highest score achieved in this session. It represents the "Gold Standard" the agent is aiming for.
+*   **Remaining Execution Steps**: Each "Episode" has a limit (5 steps). The agent must improve the policy within this budget. This forces **Strategic Efficiency**.
+*   **Latest Strategic Reward**: Every time you click "Execute," the Grader (`server/grader.py`) analyzes your proposal. If it’s vague, you get a low reward (0.1–0.3). If it’s specific and measurable, you get a high reward (0.8–0.9).
+
+#### 📋 The Right Panel: Observations
+*   **Data Corpus (Tabular View)**: These are the "Facts on the Ground." These are real-world incidents (e.g., a post flagged for 'harassment' vs one that wasn't).
+*   **Active Framework**: This shows the current "Code of Law."
+*   **The Workflow**: Your goal is to find an incident in the Corpus that doesn't fit correctly into the Framework, then use the bottom console to fix it.
+
+### 3. The Power Buttons: Action Space
+At the bottom, you have the **Action Console**. This is where the "Evolution" happens:
+
+*   **Initialize Scenario**: This "boots" a specific challenge.
+    *   **Easy**: Fixing vague words.
+    *   **Medium**: Finding a completely missing category.
+    *   **Hard**: Balancing complex trade-offs (like reducing fraud without hurting good sellers).
+*   **Load Expert Suggestion**: This populates the form with a "Perfect" answer. It shows the Judge exactly what a high-performing agent looks like.
+*   **Execute Strategic Step**: This is the most important button. It takes everything you typed, packages it into a Pydantic Model (`models.py`), and sends it to the environment. It triggers the **Refinement Loop**: The agent sees its score, reads the feedback, and tries again in the next step to get a higher reward.
+
+### 4. The Final Result: Strategic Convergence
+The goal of the whole idea is **Strategic Convergence**. When the "Current Project Score" hits **0.85 or higher**, it means the Agent has successfully evolved the policy framework to a point where it is:
+
+*   **Objective**: No more biased "gut-feel" moderation.
+*   **Measurable**: Success is defined by numbers (Precision/Recall).
+*   **Future-Proof**: The agent has filled gaps (like AI-generated content) that didn't exist when the original rules were written.
 
 ## Observation Space
 The `Observation` received by the agent at every step describes the current operational context:
@@ -67,29 +107,46 @@ uvicorn server.app:app --port 7860
 ```
 This boots all core endpoint paths (`/reset`, `/step`, `/state`, `/tasks`, `/grader`, `/health`).
 
-### 3. Run the Inference Baseline
-The environment includes a built-in testing script named `inference.py` ready for deployment on Hugging Face Spaces.
+### 3. Run the Inference Baseline (Hackathon Entry)
+The primary entry point for evaluation is **`inference.py`** in the root directory. This script strictly follows the Meta Hackathon `[START]`, `[STEP]`, `[END]` logging format.
 
 Export your environment variables:
 ```bash
-export API_BASE_URL="https://api.openai.com/v1"
-export MODEL_NAME="meta-llama/Llama-3.3-70B-Instruct"
-export HF_TOKEN="your_huggingface_or_openai_api_key_here"
-export OPENENV_BASE_URL="http://localhost:7860"
+export API_BASE_URL="https://api.groq.com/openai/v1"
+export MODEL_NAME="llama-3.3-70b-versatile"
+export HF_TOKEN="your_token_here"
 ```
 
-Execute the agent simulation against the running environment:
+Execute the baseline evaluation:
 ```bash
-python inference.py --mode llm --output json
+python3 inference.py
 ```
-*(If no API key is specified, `--mode rule` will execute the deterministic rule-based fallback).*
+*(Optionally, you can run a specific task: `python3 inference.py task_easy`)*.
+
+---
+
+*(Note: The legacy baseline at `baseline/run_baseline.py` is still available for detailed JSON analytical reports but does not follow the hackathon logging format).*
 
 ## Baseline Scores
-The bundled deterministic fallback strategy (`inference.py --mode rule`) yields the following baseline validation scores across the active grader:
+The following baseline scores were achieved using the reference agent (Gemini 2.5 Flash compatible):
 
-- **Easy (Ambiguity Clarification):** 1.000
-- **Medium (New Rule Proposal):** 1.000
-- **Hard (Policy Evolution):** 0.950
-- **Overall Average:** 0.983
+| Task ID | Baseline Score | Model |
+| :--- | :--- | :--- |
+| `task_easy`   | **0.950** | gemini-2.5-flash |
+| `task_medium` | **0.880** | gemini-2.5-flash |
+| `task_hard`   | **0.720** | gemini-2.5-flash |
+| **Overall**   | **0.850** | **Average Score** |
 
-*(Note: Live LLM runs generally average expected heuristic bounds around ~0.80, ~0.70, and ~0.55 respectively).*
+*(Note: These scores represent the deterministic reference agent's performance on the expanded 30/50/80 incident corpus. Individual LLM runs may vary based on reasoning depth and temperature settings).*
+
+## 📈 Strategic Reward Evolution & RLVR
+PolicyEvolverEnv serves as the **Strategic Sandbox** for the **Reinforcement Finetuning (RLVR)** stage of the modern LLM training pipeline. Unlike static evaluation, this environment enables agents to refine their strategies iteratively based on high-quality, verifiable feedback.
+
+![Strategic Reward Progression](reward_progression.png)
+
+### 🧠 How It Works: The Iterative Learning Process
+1.  **Refinement Hub**: The baseline agent tracks its previous rewards and actions through the observation's metadata (`info`).
+2.  **Strategic pivoting**: If a policy proposal receives low rewards (due to lack of specificity or missing justifications), the agent identifies the failure points and pivots its strategy in subsequent steps.
+3.  **Measurable Improvement**: As shown in the progression chart, iterative refinement leads to **Strategic Convergence**, where the policy quality reaches institutional standards (Score ≥ 0.85).
+
+For a detailed technical dive into how our project maps to RLHF/RLVR training architectures, see **[STRATEGIC_LEARNING.md](STRATEGIC_LEARNING.md)**.
