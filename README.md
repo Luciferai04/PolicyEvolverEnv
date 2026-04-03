@@ -6,11 +6,24 @@ sdk: docker
 app_port: 7860
 base_path: /dashboard/
 ---
-# PolicyEvolverEnv
+#  PolicyEvolverEnv — Multi-Modal Strategic Governance Sandbox
 
-**PolicyEvolverEnv** is an OpenEnv-compliant reinforcement learning environment designed for the Meta × PyTorch × Scaler Hackathon.
+**PolicyEvolverEnv** is an OpenEnv-compliant reinforcement learning environment designed for the **Meta × PyTorch × Scaler Hackathon**. It serves as a production-grade benchmark for **Reinforcement Learning from Verifiable Rewards (RLVR)**.
 
-## Environment Description & Motivation
+---
+
+### 🧪 Advanced Reward Shaping (RLVR Integration)
+Unlike standard environments with static rewards, **PolicyEvolverEnv v2.0** implements a sophisticated, deterministic grading engine designed to harden LLM strategic reasoning:
+
+*   **Tiered CoT Bonus**: Rewards analytical reasoning (up to +0.20) based on keyword density and length.
+*   **Clarity Coherence**: Penalizes "vague" or "subjective" (e.g., *maybe, perhaps*) policy definitions in Easy tasks.
+*   **Tradeoff Realism**: Detects and caps "hallucinated" outcomes in Hard tasks (e.g., claiming to simultaneously maximize fraud-prevention and revenue).
+*   **Step-Delta Shaping**: Provides an `improvement_bonus` for iterative actions that significantly outperform the episode's best score.
+*   **Anti-Repetition Penalty**: Encounters a -0.30 penalty for exact repeated actions, forcing the agent toward continuous evolution.
+
+---
+
+##  Environment Description & Motivation
 PolicyEvolverEnv is a real-world governance sandbox where an AI agent learns to **design and evolve governance policies** through meta-reasoning over real-world operational data. In modern platforms (social media, enterprise HR, e-commerce), static policies quickly become outdated or vaguely applied, leading to inconsistent enforcement, false-positive moderation, and unrecognized fraud. 
 
 This environment simulates this challenge by presenting the agent with a corpus of operational data alongside an existing policy framework. The agent's goal is to analyze the outcomes, identify systemic flaws or ambiguities, and act directly on the policies to optimize governance outcomes. This directly tackles live production problems faced by platforms like Meta.
@@ -28,12 +41,12 @@ The environment represents the **Reinforcement Learning from Verifiable Rewards 
 ### 2. The Gradio "Judge Console": How it Works
 The dashboard we built (`server/app.py`) is the human-readable window into this environment. It’s designed as a **Command & Control** center for a "Policy Judge."
 
-#### 📈 The Left Panel: Scenario Metrics
+####  The Left Panel: Scenario Metrics
 *   **Environment Best Score**: This tracks the highest score achieved in this session. It represents the "Gold Standard" the agent is aiming for.
 *   **Remaining Execution Steps**: Each "Episode" has a limit (5 steps). The agent must improve the policy within this budget. This forces **Strategic Efficiency**.
 *   **Latest Strategic Reward**: Every time you click "Execute," the Grader (`server/grader.py`) analyzes your proposal. If it’s vague, you get a low reward (0.1–0.3). If it’s specific and measurable, you get a high reward (0.8–0.9).
 
-#### 📋 The Right Panel: Observations
+####  The Right Panel: Observations
 *   **Data Corpus (Tabular View)**: These are the "Facts on the Ground." These are real-world incidents (e.g., a post flagged for 'harassment' vs one that wasn't).
 *   **Active Framework**: This shows the current "Code of Law."
 *   **The Workflow**: Your goal is to find an incident in the Corpus that doesn't fit correctly into the Framework, then use the bottom console to fix it.
@@ -142,7 +155,7 @@ The following baseline scores were achieved using the reference agent (Gemini 2.
 ## 📈 Strategic Reward Evolution & RLVR
 PolicyEvolverEnv serves as the **Strategic Sandbox** for the **Reinforcement Finetuning (RLVR)** stage of the modern LLM training pipeline. Unlike static evaluation, this environment enables agents to refine their strategies iteratively based on high-quality, verifiable feedback.
 
-![Strategic Reward Progression](reward_progression.png)
+![Reward Progression](https://raw.githubusercontent.com/Luciferai04/PolicyEvolverEnv/master/reward_progression.png)
 
 ### 🧠 How It Works: The Iterative Learning Process
 1.  **Refinement Hub**: The baseline agent tracks its previous rewards and actions through the observation's metadata (`info`).
