@@ -148,6 +148,11 @@ def build_custom_ui():
             })
         df_corpus = pd.DataFrame(corpus_data) if corpus_data else pd.DataFrame(columns=["ID", "Content", "System Action"])
 
+        # 2. Policy List (Markdown)
+        policy_md = "### 📜 Active Governance Framework\n"
+        for p in obs.get("current_policies", []):
+            policy_md += f"- **{p.get('id')}**: {p.get('text')}\n"
+
         # 3. Simple Stats & Reward History
         history = obs.get("info", {}).get("rewards_history", [])
         df_reward = pd.DataFrame({
