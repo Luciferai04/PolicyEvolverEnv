@@ -155,12 +155,11 @@ def build_custom_ui():
 
         # 3. Simple Stats & Reward History
         history = obs.get("info", {}).get("rewards_history", [])
+        # Always include point (0,0) to ensure a visible line from episode start
         df_reward = pd.DataFrame({
-            "Step": [i + 1 for i in range(len(history))],
-            "Reward": history
+            "Step": [0] + [i + 1 for i in range(len(history))],
+            "Reward": [0.0] + [float(r) for r in history]
         })
-        if df_reward.empty:
-            df_reward = pd.DataFrame({"Step": [0], "Reward": [0.0]})
 
         best_score = obs.get("info", {}).get("best_score", 0.0)
         steps_left = obs.get("info", {}).get("steps_remaining", 5)
@@ -201,7 +200,8 @@ def build_custom_ui():
             
             return df, pol, score, steps, ep, stat, df_hist, reward_msg, json.dumps(obs, indent=2)
         except Exception as e:
-            return pd.DataFrame(), f"### Execution Error\n{str(e)}", 0, 0, "ERROR", "### ERROR", pd.DataFrame(), f"Traceback:\n{traceback.format_exc()}", "{}"
+            err_df = pd.DataFrame({"Step": [0], "Reward": [0.0]})
+            return pd.DataFrame(), f"### Execution Error\n{str(e)}", 0, 0, "ERROR", "### ERROR", err_df, f"Traceback:\n{traceback.format_exc()}", "{}"
 
     with gr.Blocks(
         title="PolicyEvolver Judge Console",
