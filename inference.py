@@ -103,8 +103,8 @@ def run_episode(task_id: str):
     rewards = []
     success = False
     
-    # Strategic refinement for 3 steps (Fix C: Limit steps for 20min run)
-    for _ in range(3):
+    # Strategic refinement for 5 steps (Audit Mode: 5 iterations)
+    for _ in range(5):
         step_num += 1
         action_dict = agent.act(task_id, obs.model_dump())
         

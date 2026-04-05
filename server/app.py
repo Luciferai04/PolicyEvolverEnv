@@ -148,12 +148,15 @@ def build_custom_ui():
             })
         df_corpus = pd.DataFrame(corpus_data) if corpus_data else pd.DataFrame(columns=["ID", "Content", "System Action"])
 
-        # 2. Policy List (Markdown)
-        policy_md = "### 📜 Active Governance Framework\n"
-        for p in obs.get("current_policies", []):
-            policy_md += f"- **{p.get('id')}**: {p.get('text')}\n"
-        
-        # 3. Simple Stats
+        # 3. Simple Stats & Reward History
+        history = obs.get("info", {}).get("rewards_history", [])
+        df_reward = pd.DataFrame({
+            "Step": [i + 1 for i in range(len(history))],
+            "Reward": history
+        })
+        if df_reward.empty:
+            df_reward = pd.DataFrame({"Step": [0], "Reward": [0.0]})
+
         best_score = obs.get("info", {}).get("best_score", 0.0)
         steps_left = obs.get("info", {}).get("steps_remaining", 5)
         episode_id = obs.get("episode_id", "N/A")[:8]
@@ -162,13 +165,13 @@ def build_custom_ui():
         total = obs.get("corpus_size", len(corpus_data))
         corpus_stat = f"### 📊 Corpus: **{shown}** of **{total}** incidents displayed"
         
-        return df_corpus, policy_md, best_score, steps_left, episode_id, corpus_stat
+        return df_corpus, policy_md, best_score, steps_left, episode_id, corpus_stat, df_reward
 
     def handle_reset(task_id):
         obs = env.reset(task_id=task_id).model_dump()
-        df, pol, score, steps, ep, stat = format_obs(obs)
+        df, pol, score, steps, ep, stat, df_hist = format_obs(obs)
         reward_msg = "### 🏁 Scenario Initialized\nReview the Data Corpus and Active Framework to identify gaps."
-        return df, pol, score, steps, ep, stat, reward_msg, json.dumps(obs, indent=2)
+        return df, pol, score, steps, ep, stat, df_hist, reward_msg, json.dumps(obs, indent=2)
 
     def handle_step(task_id, action_type, easy_term, easy_def, easy_just, easy_think,
                     med_domain, med_rule, med_scope, med_just, med_think,
@@ -185,15 +188,15 @@ def build_custom_ui():
             validated_action = Action.model_validate(payload)
             obs_obj = env.step(validated_action)
             obs = obs_obj.model_dump()
-            df, pol, score, steps, ep, stat = format_obs(obs)
+            df, pol, score, steps, ep, stat, df_hist = format_obs(obs)
             
             reward = obs.get("reward", 0.0)
             color = "green" if reward > 0 else "orange" if reward == 0 else "red"
             reward_msg = f"### <span style='color:{color}'>Latest Strategic Reward: {reward}</span>\nCurrent Project Score: {score}"
             
-            return df, pol, score, steps, ep, stat, reward_msg, json.dumps(obs, indent=2)
+            return df, pol, score, steps, ep, stat, df_hist, reward_msg, json.dumps(obs, indent=2)
         except Exception as e:
-            return pd.DataFrame(), f"### Execution Error\n{str(e)}", 0, 0, "ERROR", "### ERROR", f"Traceback:\n{traceback.format_exc()}", "{}"
+            return pd.DataFrame(), f"### Execution Error\n{str(e)}", 0, 0, "ERROR", "### ERROR", pd.DataFrame(), f"Traceback:\n{traceback.format_exc()}", "{}"
 
     with gr.Blocks(
         title="PolicyEvolver Judge Console", 
@@ -210,6 +213,17 @@ def build_custom_ui():
                 best_score_disp = gr.Number(label="Environment Best Score", value=0.0, interactive=False)
                 steps_left_disp = gr.Number(label="Remaining Execution Steps", value=5, interactive=False)
                 episode_disp = gr.Textbox(label="Active Episode ID", value="N/A", interactive=False)
+                
+                gr.Markdown("### 📈 Reward Evolution")
+                reward_plot = gr.LinePlot(
+                    label="Strategic Reward Trend",
+                    x="Step",
+                    y="Reward",
+                    tooltip=["Step", "Reward"],
+                    width=300,
+                    height=200,
+                )
+                
                 reward_outcome_disp = gr.Markdown("### Awaiting Scenario...")
                 
                 gr.Markdown("---")
@@ -330,19 +344,19 @@ def build_custom_ui():
             return (t_id, mode) + res
 
         # Event Listeners
-        reset_btn.click(handle_reset, inputs=[task_id], outputs=[corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_outcome_disp, raw_json_box])
+        reset_btn.click(handle_reset, inputs=[task_id], outputs=[corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_plot, reward_outcome_disp, raw_json_box])
         
         # Automatic Sync: Radio -> Dropdown & Initialize
         action_mode.change(
             sync_from_mode, 
             inputs=[action_mode], 
-            outputs=[task_id, corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_outcome_disp, raw_json_box]
+            outputs=[task_id, corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_plot, reward_outcome_disp, raw_json_box]
         )
         
         # Automatic Sync: Tab -> Dropdown & Radio & Initialize
         action_tabs.select(
             sync_from_tab,
-            outputs=[task_id, action_mode, corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_outcome_disp, raw_json_box]
+            outputs=[task_id, action_mode, corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_plot, reward_outcome_disp, raw_json_box]
         )
 
         step_btn.click(
@@ -353,7 +367,7 @@ def build_custom_ui():
                 med_domain, med_rule, med_scope, med_just, med_think,
                 hard_mods, hard_outcomes, hard_just, hard_think
             ],
-            outputs=[corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_outcome_disp, raw_json_box]
+            outputs=[corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_plot, reward_outcome_disp, raw_json_box]
         )
 
     return demo

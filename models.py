@@ -100,3 +100,4 @@ class State(BaseModel):
     current_score: float = 0.0
     best_score: float = 0.0
     actions_taken: List[str] = Field(default_factory=list)
+    rewards_history: List[float] = Field(default_factory=list)

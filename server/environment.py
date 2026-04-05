@@ -132,6 +132,7 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
         self._state.current_score = reward
         self._state.best_score = max(self._state.best_score, reward)
         self._persistent_best_score = max(self._persistent_best_score, reward)
+        self._state.rewards_history.append(reward)
 
         action_type = action_dict.get("action_type", "unknown") if isinstance(action_dict, dict) else "unknown"
         self._state.actions_taken.append(action_type)
@@ -178,6 +179,7 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
             info={
                 "best_score": self._state.best_score,
                 "last_reward": reward,
+                "rewards_history": self._state.rewards_history,
                 "action_history": self._state.actions_taken,
                 "steps_remaining": self._state.max_steps - self._state.step_count,
             },
