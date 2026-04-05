@@ -199,9 +199,7 @@ def build_custom_ui():
             return pd.DataFrame(), f"### Execution Error\n{str(e)}", 0, 0, "ERROR", "### ERROR", pd.DataFrame(), f"Traceback:\n{traceback.format_exc()}", "{}"
 
     with gr.Blocks(
-        title="PolicyEvolver Judge Console", 
-        theme=gr.themes.Default(primary_hue="blue"),
-        css=".progress-badge { display: none !important; }"
+        title="PolicyEvolver Judge Console",
     ) as demo:
         gr.HTML("<h1 style='text-align: center; color: #2D5A27;'>PolicyEvolver: Judge's Strategic Console</h1>")
         gr.Markdown("Welcome, Judge Agent. Use this console to identify data-to-policy gaps and propose measurable governance refinements.")
@@ -220,8 +218,6 @@ def build_custom_ui():
                     x="Step",
                     y="Reward",
                     tooltip=["Step", "Reward"],
-                    width=300,
-                    height=200,
                 )
                 
                 reward_outcome_disp = gr.Markdown("### Awaiting Scenario...")
