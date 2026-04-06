@@ -1,5 +1,5 @@
 name: "PolicyEvolverEnv"
-description: "Policy Design and Evolution Sandbox — agents learn to evolve real-world governance frameworks through meta-reasoning"
+description: "Policy Design and Evolution Sandbox — agents refine their strategy to evolve real-world governance frameworks through meta-reasoning"
 version: "1.0.0"
 author: "PolicyEvolution Team"
 tags:
@@ -12,6 +12,16 @@ tags:
 environment:
   module: "server.environment"
   class: "PolicyEvolverEnvironment"
+  variables:
+    HF_TOKEN:
+      description: "API key for LLM inference provider (Groq recommended)"
+      required: true
+    API_BASE_URL:
+      description: "OpenAI-compatible endpoint. Default: Groq"
+      default: "https://api.groq.com/openai/v1"
+    MODEL_NAME:
+      description: "Model identifier for the inference provider"
+      default: "llama-3.1-8b-instant"
 
   observation_schema:
     type: "object"

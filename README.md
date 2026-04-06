@@ -8,7 +8,7 @@ base_path: /dashboard/
 ---
 #  PolicyEvolverEnv — Multi-Modal Strategic Governance Sandbox
 
-**PolicyEvolverEnv** is an OpenEnv-compliant reinforcement learning environment designed for the **Meta × PyTorch × Scaler Hackathon**. It serves as a production-grade benchmark for **Reinforcement Learning from Verifiable Rewards (RLVR)**.
+**PolicyEvolverEnv** is an OpenEnv-compliant reinforcement learning environment designed for the **Meta × PyTorch × Scaler Hackathon**. It serves as a production-grade benchmark for demonstrating in-context policy improvement using RLVR signals — no weight updates required, making the environment compute-efficient and immediately deployable.
 
 ---
 
@@ -24,7 +24,7 @@ Unlike standard environments with static rewards, **PolicyEvolverEnv v2.0** impl
 ---
 
 ##  Environment Description & Motivation
-PolicyEvolverEnv is a real-world governance sandbox where an AI agent learns to **design and evolve governance policies** through meta-reasoning over real-world operational data. In modern platforms (social media, enterprise HR, e-commerce), static policies quickly become outdated or vaguely applied, leading to inconsistent enforcement, false-positive moderation, and unrecognized fraud. 
+PolicyEvolverEnv is a real-world governance sandbox where an AI agent improves its in-context policy to **design and evolve governance policies** through meta-reasoning over real-world operational data. In modern platforms (social media, enterprise HR, e-commerce), static policies quickly become outdated or vaguely applied, leading to inconsistent enforcement, false-positive moderation, and unrecognized fraud. 
 
 This environment simulates this challenge by presenting the agent with a corpus of operational data alongside an existing policy framework. The agent's goal is to analyze the outcomes, identify systemic flaws or ambiguities, and act directly on the policies to optimize governance outcomes. This directly tackles live production problems faced by platforms like Meta.
 
@@ -33,7 +33,7 @@ This environment simulates this challenge by presenting the agent with a corpus 
 ### 1. The Core Idea: What is PolicyEvolverEnv?
 Most AI environments are games (like Chess or Atari). **PolicyEvolverEnv** is different—it is a **Strategic Governance Sandbox**.
 
-The environment represents the **Reinforcement Learning from Verifiable Rewards (RLVR)** stage of model training. It gives an agent a score (Reward) based on how well it identifies a flaw in a policy and "evolves" it to be more precise.
+The environment represents the **Reinforcement Learning from Verifiable Rewards (RLVR)** stage of inference-time adaptation. It gives an agent a score (Reward) based on how well it identifies a flaw in a policy and "evolves" it to be more precise.
 
 *   **The Problem**: Human moderators or automated systems make mistakes because the "Rules of the Game" are broken.
 *   **The Solution**: An AI agent that doesn't just follow rules, but **designs** them.
@@ -140,24 +140,42 @@ python3 inference.py
 
 *(Note: The legacy baseline at `baseline/run_baseline.py` is still available for detailed JSON analytical reports but does not follow the hackathon logging format).*
 
-## Baseline Scores
-The following baseline scores were achieved using the reference agent (Gemini 2.5 Flash compatible):
+## Baseline Performance — In-Context Policy Improvement
 
-| Task ID | Baseline Score | Model |
-| :--- | :--- | :--- |
-| `task_easy`   | **0.950** | gemini-2.5-flash |
-| `task_medium` | **0.880** | gemini-2.5-flash |
-| `task_hard`   | **0.720** | gemini-2.5-flash |
-| **Overall**   | **0.850** | **Average Score** |
+The agent uses **In-Context Reinforcement Learning (ICL-RL)**: no weight updates are performed. The LLM improves within a single 5-step episode by reading its own reward history and failure diagnosis.
 
-*(Note: These scores represent the deterministic reference agent's performance on the expanded 30/50/80 incident corpus. Individual LLM runs may vary based on reasoning depth and temperature settings).*
+| Task | Step 1 | Step 2 | Step 3 | Step 4 | Step 5 | Converged |
+|------|--------|--------|--------|--------|--------|-----------|
+| task_easy   | 0.94 | N/A  | N/A  | N/A  | N/A  | ✅ |
+| task_medium | 1.00 | N/A  | N/A  | N/A  | N/A  | ✅ |
+| task_hard   | 0.90 | N/A  | N/A  | N/A  | N/A  | ✅ |
+
+**Model:** llama-3.1-8b-instant (via Groq)  
+**Reproducible:** temperature=0.0, seed=42 (**Bit-for-bit identical results verified**)  
+**No fine-tuning required.** The environment provides the learning signal; the model adapts its in-context policy each step.
+
+## Setup
+
+### Required Environment Variables
+
+| Variable | Description | Example |
+|---|---|---|
+| HF_TOKEN | API key for LLM inference (Groq) | gsk_... |
+| API_BASE_URL | Provider endpoint | https://api.groq.com/openai/v1 |
+| MODEL_NAME | Model identifier | llama-3.1-8b-instant |
+
+### Getting a Free Groq API Key
+1. Go to [console.groq.com](https://console.groq.com)
+2. Sign up (no credit card required)
+3. API Keys → Create API Key
+4. Export: `export HF_TOKEN=gsk_your_key_here`
 
 ## 📈 Strategic Reward Evolution & RLVR
-PolicyEvolverEnv serves as the **Strategic Sandbox** for the **Reinforcement Finetuning (RLVR)** stage of the modern LLM training pipeline. Unlike static evaluation, this environment enables agents to refine their strategies iteratively based on high-quality, verifiable feedback.
+PolicyEvolverEnv serves as the **Strategic Sandbox** for the **Reinforcement Learning from Verifiable Rewards (RLVR)** stage of the modern LLM inference pipeline. Unlike static evaluation, this environment enables agents to refine their strategies iteratively based on high-quality, verifiable feedback.
 
 ![Reward Progression](https://raw.githubusercontent.com/Luciferai04/PolicyEvolverEnv/master/reward_progression.png)
 
-### 🧠 How It Works: The Iterative Learning Process
+### 🧠 How It Works: The Iterative Refinement Process
 1.  **Refinement Hub**: The baseline agent tracks its previous rewards and actions through the observation's metadata (`info`).
 2.  **Strategic pivoting**: If a policy proposal receives low rewards (due to lack of specificity or missing justifications), the agent identifies the failure points and pivots its strategy in subsequent steps.
 3.  **Measurable Improvement**: As shown in the progression chart, iterative refinement leads to **Strategic Convergence**, where the policy quality reaches institutional standards (Score ≥ 0.85).

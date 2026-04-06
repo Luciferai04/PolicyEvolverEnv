@@ -7,7 +7,7 @@ import traceback
 import uvicorn
 import pandas as pd
 import gradio as gr
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Body
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from openenv.core.env_server import create_fastapi_app
@@ -78,7 +78,7 @@ def list_tasks() -> list[TaskInfo]:
 
 
 @app.post("/grader")
-def get_grader_score(task_id: str, action: dict):
+def get_grader_score(task_id: str = Body(...), action: dict = Body(...)):
     """
     Grade a submission directly.
     """
@@ -101,22 +101,29 @@ def run_baseline_route():
     """
     import subprocess, sys, os
     try:
-        # Inherit required env vars
-        env_vars = os.environ.copy()
-        # Fix A: Call root-level inference.py
+        # Inherit and explicitly set mandatory Groq env vars
+        env_vars = {
+            **os.environ,
+            "HF_TOKEN": os.environ.get("HF_TOKEN", ""),
+            "API_BASE_URL": os.environ.get("API_BASE_URL", "https://api.groq.com/openai/v1"),
+            "MODEL_NAME": os.environ.get("MODEL_NAME", "llama-3.1-8b-instant"),
+        }
+        
+        # Execute root-level inference.py with 20-minute hackathon timeout
         result = subprocess.run(
             [sys.executable, "inference.py", "--output", "json"],
             capture_output=True, 
             text=True, 
-            timeout=180,
-            env=env_vars
+            timeout=1200,
+            env=env_vars,
+            cwd=os.path.dirname(os.path.abspath(__file__)) + "/.."
         )
         raw = json.loads(result.stdout)
         # Map to required structure: {"baseline_results": [...], "average_score": float, "model": ...}
         return {
             "baseline_results": raw.get("detail", []),
             "average_score": raw.get("baseline_scores", {}).get("overall_avg", 0.0),
-            "model": raw.get("model", "llama-3.3-70b-versatile")
+            "model": raw.get("model", "llama-3.1-8b-instant")
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
