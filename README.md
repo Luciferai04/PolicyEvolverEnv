@@ -96,11 +96,24 @@ The Action space utilizes a highly structured Discriminated Union model to repre
 ## Tasks
 The environment provides three procedural tasks designed to ramp up in cognitive reasoning difficulty:
 
-| Task ID | Difficulty | Expected Score | Description |
-|---|---|---|---|
-| `task_easy` | **Easy** | `~0.80` | **Ambiguity Clarification**: Identify and clarify vague policy terms (e.g., "harassment") in a social media community guideline to improve moderation consistency. |
-| `task_medium` | **Medium** | `~0.70` | **Gap Detection**: Detect uncovered HR policy scenarios involving emerging tech (AI use, gig-worker boundaries) and propose entirely new mandatory rules. |
-| `task_hard` | **Hard** | `~0.55` | **Holistic Evolution**: Analyze complex e-commerce Trust & Safety trade-offs (e.g., false-positive suspensions vs. fraud recall) to rewrite existing volume/return rate policies simultaneously. |
+### 1. Task Easy (Social Media Community Guidelines)
+*   **The Scenario:** Refining a social media platform's initial content moderation rules.
+*   **The Problem:** The existing rule simply stated that "offensive or inappropriate content" was prohibited. This was far too subjective, leading to inconsistent moderation.
+*   **The Policy Applied (Action taken by Agent):** The agent was required to use the `propose_clarification` action. It took the vague term (like "offensive") and redefined it using strict, measurable thresholds (e.g., "specific threats of physical violence" or "explicit slurs targeting protected identity characteristics"). By removing subjectivity, the policy became actionable and deterministic.
+
+### 2. Task Medium (Corporate HR Data Privacy)
+*   **The Scenario:** Updating a company's internal confidentiality framework.
+*   **The Problem:** The existing HR policy covered generic data protection but had a massive gap regarding the use of modern Generative AI tools (like employees pasting proprietary code into ChatGPT).
+*   **The Policy Applied (Action taken by Agent):** The agent was required to use the `propose_new_rule` action. It drafted an entirely new policy targeting the specific gap: "Employees must explicitly disclose and gain approval for any use of Generative AI tools when handling proprietary code or client proposals." This successfully bridged the gap between basic confidentiality and modern AI risks.
+
+### 3. Task Hard (E-Commerce Trust & Safety Framework)
+*   **The Scenario:** Managing an e-commerce platform facing a complex fraud problem, where current rules were causing too many "false positives" (locking out legitimate, high-volume sellers).
+*   **The Problem:** The platform needed to catch rapid-velocity fraud without ruining the experience for trusted legacy merchants.
+*   **The Policy Applied (Action taken by Agent):** The agent used the `evolve_policy` action for a holistic system update. It had to apply at least two complex modifications to balance Precision and Recall:
+    *   **Tightening Rule:** Added a strict identity-verification trigger for new sellers showing extreme sales velocity (e.g., >20 sales/day in first 30 days).
+    *   **Exemption Rule:** Rolled back the manual review thresholds for trusted legacy sellers to reduce false positives and preserve revenue.
+
+*In short: Easy focused on removing vagueness, Medium focused on patching a missing risk gap (GenAI), and Hard focused on balancing complex system trade-offs (Fraud vs. Revenue).*
 
 ## Setup & Usage
 
