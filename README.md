@@ -12,7 +12,7 @@ base_path: /dashboard/
 
 ---
 
-### 🧪 Advanced Reward Shaping (RLVR Integration)
+### Advanced Reward Shaping (RLVR Integration)
 Unlike standard environments with static rewards, **PolicyEvolverEnv v2.0** implements a sophisticated, deterministic grading engine designed to harden LLM strategic reasoning:
 
 *   **Tiered CoT Bonus**: Rewards analytical reasoning (up to +0.20) based on keyword density and length.
@@ -159,9 +159,9 @@ The agent uses **In-Context Reinforcement Learning (ICL-RL)**: no weight updates
 
 | Task | Step 1 | Step 2 | Step 3 | Step 4 | Step 5 | Converged |
 |------|--------|--------|--------|--------|--------|-----------|
-| task_easy   | 0.94 | N/A  | N/A  | N/A  | N/A  | ✅ |
-| task_medium | 1.00 | N/A  | N/A  | N/A  | N/A  | ✅ |
-| task_hard   | 0.90 | N/A  | N/A  | N/A  | N/A  | ✅ |
+| task_easy   | 0.94 | N/A  | N/A  | N/A  | N/A  | Yes       |
+| task_medium | 1.00 | N/A  | N/A  | N/A  | N/A  | Yes       |
+| task_hard   | 0.90 | N/A  | N/A  | N/A  | N/A  | Yes       |
 
 **Model:** llama-3.1-8b-instant (via Groq)  
 **Reproducible:** temperature=0.0, seed=42 (**Bit-for-bit identical results verified**)  
@@ -183,12 +183,12 @@ The agent uses **In-Context Reinforcement Learning (ICL-RL)**: no weight updates
 3. API Keys → Create API Key
 4. Export: `export HF_TOKEN=gsk_your_key_here`
 
-## 📈 Strategic Reward Evolution & RLVR
+## Strategic Reward Evolution & RLVR
 PolicyEvolverEnv serves as the **Strategic Sandbox** for the **Reinforcement Learning from Verifiable Rewards (RLVR)** stage of the modern LLM inference pipeline. Unlike static evaluation, this environment enables agents to refine their strategies iteratively based on high-quality, verifiable feedback.
 
 ![Reward Progression](https://raw.githubusercontent.com/Luciferai04/PolicyEvolverEnv/master/reward_progression.png)
 
-### 🧠 How It Works: The Iterative Refinement Process
+### How It Works: The Iterative Refinement Process
 1.  **Refinement Hub**: The baseline agent tracks its previous rewards and actions through the observation's metadata (`info`).
 2.  **Strategic pivoting**: If a policy proposal receives low rewards (due to lack of specificity or missing justifications), the agent identifies the failure points and pivots its strategy in subsequent steps.
 3.  **Measurable Improvement**: As shown in the progression chart, iterative refinement leads to **Strategic Convergence**, where the policy quality reaches institutional standards (Score ≥ 0.85).
