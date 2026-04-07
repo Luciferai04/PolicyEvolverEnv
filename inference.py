@@ -29,6 +29,27 @@ API_KEY = os.environ.get("API_KEY") or os.environ.get("HF_TOKEN")
 API_BASE_URL = os.environ.get("API_BASE_URL")
 MODEL_NAME = os.environ.get("MODEL_NAME")
 BENCHMARK = "policy_evolver_env"
+
+# ─── Auto-discover model if MODEL_NAME is not set ───
+if not MODEL_NAME and API_BASE_URL and API_KEY:
+    try:
+        import httpx
+        resp = httpx.get(
+            f"{API_BASE_URL.rstrip('/')}/models",
+            headers={"Authorization": f"Bearer {API_KEY}"},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            models_data = resp.json().get("data", [])
+            if models_data:
+                MODEL_NAME = models_data[0].get("id", "gpt-4o-mini")
+                print(f"[DEBUG] Auto-discovered model: {MODEL_NAME}", flush=True)
+    except Exception as e:
+        print(f"[DEBUG] Model discovery failed: {e}", flush=True)
+
+if not MODEL_NAME:
+    MODEL_NAME = "gpt-4o-mini"
+    print(f"[DEBUG] Using default MODEL_NAME: {MODEL_NAME}", flush=True)
 MAX_STEPS = 5
 TEMPERATURE = 0.0
 SUCCESS_THRESHOLD = 0.70
