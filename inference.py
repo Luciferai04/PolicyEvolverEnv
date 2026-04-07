@@ -10,7 +10,7 @@ MANDATORY ENV VARS:
 STDOUT FORMAT:
     [START] task=<task_name> env=policy_evolver_env model=<model_name>
     [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
-    [END]   success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>
+    [END]   task=<task_name> success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>
 """
 
 import asyncio
@@ -39,14 +39,14 @@ def log_start(task: str, env: str, model: str) -> None:
 
 
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
-    error_val = error if error else "null"
+    error_val = f'"{error}"' if error else "null"
     done_val = str(done).lower()
     print(f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}", flush=True)
 
 
-def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+def log_end(task: str, success: bool, steps: int, score: float, rewards: List[float]) -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
+    print(f"[END] task={task} success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
 
 
 # ─── LLM Agent ───
@@ -201,15 +201,25 @@ class PolicyEvolverAgent:
 
 
 # ─── Episode Runner ───
-async def run_episode(client: OpenAI, env: PolicyEvolverEnv, task_id: str) -> dict:
+async def run_episode(client: Optional[OpenAI], env: Optional[PolicyEvolverEnv], task_id: str, setup_error: Optional[Exception] = None) -> dict:
     """Run a single task episode following the hackathon format."""
+    log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
+
+    if setup_error:
+        log_step(step=1, action="setup", reward=0.0, done=True, error=str(setup_error))
+        log_end(task=task_id, success=False, steps=0, score=0.0, rewards=[])
+        return {"task_id": task_id, "reward": 0.0}
+
+    if not client or not env:
+        log_step(step=1, action="setup", reward=0.0, done=True, error="Client or Environment not initialized")
+        log_end(task=task_id, success=False, steps=0, score=0.0, rewards=[])
+        return {"task_id": task_id, "reward": 0.0}
+
     agent = PolicyEvolverAgent(MODEL_NAME)
     rewards: List[float] = []
     steps_taken = 0
     score = 0.0
     success = False
-
-    log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
     try:
         result = await env.reset(task_id=task_id)
@@ -258,37 +268,53 @@ async def run_episode(client: OpenAI, env: PolicyEvolverEnv, task_id: str) -> di
         log_step(step=steps_taken + 1, action="error", reward=0.0, done=True, error=str(e))
 
     finally:
-        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+        log_end(task=task_id, success=success, steps=steps_taken, score=score, rewards=rewards)
 
     return {"task_id": task_id, "reward": score}
 
 
 # ─── Main Entry Point ───
 async def main() -> None:
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    client = None
     env = None
+    setup_error = None
 
     try:
-        if IMAGE_NAME:
-            env = await PolicyEvolverEnv.from_docker_image(IMAGE_NAME)
-        else:
-            local_url = os.environ.get("ENV_BASE_URL", "http://127.0.0.1:7860")
-            env = PolicyEvolverEnv(base_url=local_url)
+        # 1. Initialize OpenAI Client
+        try:
+            if not API_KEY or API_KEY == "dummy_key":
+                # In validator, API_KEY might be missing if they didn't pass it yet, but we shouldn't crash
+                pass
+            client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY or "dummy")
+        except Exception as e:
+            setup_error = Exception(f"OpenAI client initialization failed: {e}")
 
-        tasks = ["task_easy", "task_medium", "task_hard"]
-
-        for task in tasks:
-            await run_episode(client, env, task)
+        # 2. Initialize Environment
+        if not setup_error:
+            try:
+                if IMAGE_NAME:
+                    env = await PolicyEvolverEnv.from_docker_image(IMAGE_NAME)
+                else:
+                    local_url = os.environ.get("ENV_BASE_URL", "http://127.0.0.1:7860")
+                    env = PolicyEvolverEnv(base_url=local_url)
+                    # For local testing, we might want to check connection immediately or let run_episode handle it
+            except Exception as e:
+                setup_error = Exception(f"Environment initialization failed: {e}")
 
     except Exception as e:
-        print(f"[DEBUG] Global execution error: {e}", flush=True)
+        setup_error = e
 
-    finally:
-        if env:
-            try:
-                await env.close()
-            except Exception as e:
-                print(f"[DEBUG] env.close() error: {e}", flush=True)
+    # 3. Always loop over tasks to ensure structured logs
+    tasks = ["task_easy", "task_medium", "task_hard"]
+    for task in tasks:
+        await run_episode(client, env, task, setup_error=setup_error)
+
+    # 4. Final Cleanup
+    if env:
+        try:
+            await env.close()
+        except Exception as e:
+            print(f"[DEBUG] env.close() error: {e}", flush=True)
 
 
 if __name__ == "__main__":
