@@ -335,43 +335,34 @@ def build_custom_ui():
 
                 step_btn = gr.Button("Execute Strategic Step", variant="primary")
 
-        # Logic
+        # Logic — lightweight sync (NO reset on tab/radio change)
         def sync_from_mode(mode):
+            """Only update the dropdown to match the radio. No environment reset."""
             t_id = "task_easy"
             if mode == "propose_new_rule": t_id = "task_medium"
             elif mode == "evolve_policy": t_id = "task_hard"
-            
-            # Perform reset with the new task_id
-            res = handle_reset(t_id)
-            return (t_id,) + res
+            return t_id
 
         def sync_from_tab(evt: gr.SelectData):
-            t_id = "task_easy"
-            mode = "propose_clarification"
-            if evt.index == 1: 
-                t_id = "task_medium"
-                mode = "propose_new_rule"
-            elif evt.index == 2: 
-                t_id = "task_hard"
-                mode = "evolve_policy"
-            
-            res = handle_reset(t_id)
-            return (t_id, mode) + res
+            """Only update dropdown + radio to match the tab. No environment reset."""
+            mapping = {0: ("task_easy", "propose_clarification"), 1: ("task_medium", "propose_new_rule"), 2: ("task_hard", "evolve_policy")}
+            t_id, mode = mapping.get(evt.index, ("task_easy", "propose_clarification"))
+            return t_id, mode
 
         # Event Listeners
         reset_btn.click(handle_reset, inputs=[task_id], outputs=[corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_plot, reward_outcome_disp, raw_json_box])
         
-        # Automatic Sync: Radio -> Dropdown & Initialize
+        # Lightweight Sync: Radio -> Dropdown (instant, no reset)
         action_mode.change(
             sync_from_mode, 
             inputs=[action_mode], 
-            outputs=[task_id, corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_plot, reward_outcome_disp, raw_json_box]
+            outputs=[task_id]
         )
         
-        # Automatic Sync: Tab -> Dropdown & Radio & Initialize
+        # Lightweight Sync: Tab -> Dropdown & Radio (instant, no reset)
         action_tabs.select(
             sync_from_tab,
-            outputs=[task_id, action_mode, corpus_table, policy_display, best_score_disp, steps_left_disp, episode_disp, corpus_count_disp, reward_plot, reward_outcome_disp, raw_json_box]
+            outputs=[task_id, action_mode]
         )
 
         step_btn.click(
