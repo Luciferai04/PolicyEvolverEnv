@@ -105,7 +105,7 @@ class PolicyEvolverAgent:
             print(f"[DEBUG] LLM Call Error: {e}", file=sys.stderr)
             if 'raw' in locals():
                 print(f"[DEBUG] Raw content: {raw}", file=sys.stderr)
-            return None
+            raise e
 
     def _build_feedback(self, step: int, last_score: float, last_action: dict, task_id: str) -> str:
         """Build diagnostic feedback from previous step for in-context learning."""
@@ -205,29 +205,6 @@ class PolicyEvolverAgent:
             )
 
         result = self._call_llm(client, prompt)
-        if result is None:
-            # Task-Aware fallback so we never crash and actions remain valid
-            if task_id == "task_easy":
-                return {
-                    "action_type": "propose_clarification",
-                    "ambiguous_term": "offensive",
-                    "suggested_definition": "Content is offensive if it contains explicit slurs or direct threats of violence verified by local context.",
-                    "affected_policy_ids": ["pol_001"], "justification": "Fallback clarification.", "think": "LLM failed - using robust baseline."
-                }
-            elif task_id == "task_medium":
-                return {
-                    "action_type": "propose_new_rule",
-                    "rule_domain": "generative_ai_use",
-                    "new_rule": "Employees must explicitly disclose all generative AI interactions for proprietary code drafting.",
-                    "scope": ["code", "proprietary"], "integration_points": ["pol_ai_001"], "justification": "Fallback new rule.", "think": "LLM failed - using robust baseline."
-                }
-            else:
-                return {
-                    "action_type": "evolve_policy",
-                    "policy_modifications": [{"policy_id": "pol_rev_001", "change_type": "enhance", "new_text": "Apply manual review to high velocity sellers.", "reason": "Systemic safety."}],
-                    "expected_outcomes": {"fraud_rate": 0.5, "revenue_velocity": 0.5, "seller_trust": 0.5},
-                    "rollback_conditions": ["If fraud rate peaks"], "justification": "Fallback evolution.", "think": "LLM failed - using robust baseline."
-                }
         return result
 
 

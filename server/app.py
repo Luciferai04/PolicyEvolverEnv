@@ -130,6 +130,7 @@ def run_baseline_route():
             "average_score": round(avg, 4),
             "model": os.environ.get("MODEL_NAME", "llama-3.1-8b-instant"),
             "stdout": result.stdout[-2000:] if result.stdout else "",
+            "stderr": result.stderr[-2000:] if result.stderr else "",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
