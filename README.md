@@ -3,7 +3,7 @@ title: PolicyEvolverEnv
 colorFrom: blue
 colorTo: indigo
 sdk: docker
-app_port: 7860
+app_port: 8000
 base_path: /dashboard/
 ---
 #  PolicyEvolverEnv — Multi-Modal Strategic Governance Sandbox
@@ -140,7 +140,7 @@ pip install -r server/requirements.txt
 ### 2. Run the Environment API
 Start the FastAPI environment server locally:
 ```bash
-uvicorn server.app:app --port 7860
+uvicorn server.app:app --port 8000
 ```
 This boots all core endpoint paths (`/reset`, `/step`, `/state`, `/tasks`, `/grader`, `/health`).
 
