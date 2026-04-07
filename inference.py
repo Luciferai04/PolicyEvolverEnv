@@ -270,8 +270,16 @@ async def run_episode(client: Optional[OpenAI], env: Optional[PolicyEvolverEnv],
             elif not isinstance(obs_dict, dict):
                 obs_dict = dict(obs_dict)
 
-            # Agent decides action
-            action_dict = agent.get_action(client, task_id, obs_dict)
+            # Agent decides action (graceful failure per step)
+            try:
+                action_dict = agent.get_action(client, task_id, obs_dict)
+            except Exception as e:
+                # LLM call failed — log error for this step and move to next task
+                print(f"[DEBUG] LLM error on step {step}: {e}", file=sys.stderr)
+                log_step(step=step, action="llm_error", reward=0.0, done=True, error=str(e))
+                rewards.append(0.0)
+                steps_taken = step
+                break
             agent.action_history.append(action_dict)
 
             # Validate and step
