@@ -99,31 +99,37 @@ def run_baseline_route():
     """
     Run the baseline agent on all tasks and return scores.
     """
-    import subprocess, sys, os
+    import subprocess, sys, os, re
     try:
-        # Inherit and explicitly set mandatory Groq env vars
         env_vars = {
             **os.environ,
             "HF_TOKEN": os.environ.get("HF_TOKEN", ""),
             "API_BASE_URL": os.environ.get("API_BASE_URL", "https://api.groq.com/openai/v1"),
             "MODEL_NAME": os.environ.get("MODEL_NAME", "llama-3.1-8b-instant"),
+            "ENV_BASE_URL": "http://127.0.0.1:7860",
         }
         
-        # Execute root-level inference.py with 20-minute hackathon timeout
         result = subprocess.run(
-            [sys.executable, "inference.py", "--output", "json"],
+            [sys.executable, "inference.py"],
             capture_output=True, 
             text=True, 
             timeout=1200,
             env=env_vars,
             cwd=os.path.dirname(os.path.abspath(__file__)) + "/.."
         )
-        raw = json.loads(result.stdout)
-        # Map to required structure: {"baseline_results": [...], "average_score": float, "model": ...}
+        # Parse [END] lines from stdout to extract scores
+        scores = []
+        for line in result.stdout.splitlines():
+            if line.startswith("[END]"):
+                m = re.search(r"score=([\d.]+)", line)
+                if m:
+                    scores.append(float(m.group(1)))
+        avg = sum(scores) / len(scores) if scores else 0.0
         return {
-            "baseline_results": raw.get("detail", []),
-            "average_score": raw.get("baseline_scores", {}).get("overall_avg", 0.0),
-            "model": raw.get("model", "llama-3.1-8b-instant")
+            "baseline_results": scores,
+            "average_score": round(avg, 4),
+            "model": os.environ.get("MODEL_NAME", "llama-3.1-8b-instant"),
+            "stdout": result.stdout[-2000:] if result.stdout else "",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
