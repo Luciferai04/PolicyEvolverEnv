@@ -378,17 +378,13 @@ def build_custom_ui():
 
     return demo
 
-# Lazy Gradio UI Mounting
-@app.on_event("startup")
-async def startup_event():
-    import gradio as gr
-    # Import locally to avoid module-level overhead
-    try:
-        custom_demo = build_custom_ui()
-        gr.mount_gradio_app(app, custom_demo, path="/dashboard/")
-        print("[INFO] PolicyEvolver Dashboard mounted at /dashboard/")
-    except Exception as e:
-        print(f"[WARNING] Failed to mount Gradio Dashboard: {e}")
+# Mount Gradio at module level (required for Gradio queue/WebSocket to work)
+try:
+    custom_demo = build_custom_ui()
+    app = gr.mount_gradio_app(app, custom_demo, path="/dashboard/")
+    print("[INFO] PolicyEvolver Dashboard mounted at /dashboard/")
+except Exception as e:
+    print(f"[WARNING] Failed to mount Gradio Dashboard: {e}")
 
 def main():
     # Sync with Hugging Face and local requirements
