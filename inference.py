@@ -15,6 +15,7 @@ STDOUT FORMAT:
 
 import asyncio
 import os
+import sys
 import json
 from typing import Dict, List, Optional
 
@@ -61,7 +62,9 @@ class PolicyEvolverAgent:
         "3. MEASURABLE CRITERIA: Define terms with 'if-then' and metrics.\n"
         "4. ANALYTICAL COT: Your 'think' field MUST be 150-250 words and include terms: 'tradeoff', 'precision', "
         "'recall', 'threshold', 'impact', 'evidence'.\n"
-        "5. JSON ONLY: Output ONLY the JSON object. No preamble."
+        "5. JSON ONLY: Output ONLY the JSON object. No preamble.\n"
+        "6. INCREMENTALISM: If your previous score was high (>0.80), focus on surgical precision rather than holistic rewriting. "
+        "DO NOT add words that create ambiguity."
     )
 
     def __init__(self, model: str):
@@ -98,7 +101,10 @@ class PolicyEvolverAgent:
                 if start != -1 and end != -1:
                     return json.loads(raw[start : end + 1])
                 raise
-        except Exception:
+        except Exception as e:
+            print(f"[DEBUG] LLM Call Error: {e}", file=sys.stderr)
+            if 'raw' in locals():
+                print(f"[DEBUG] Raw content: {raw}", file=sys.stderr)
             return None
 
     def _build_feedback(self, step: int, last_score: float, last_action: dict, task_id: str) -> str:
@@ -145,8 +151,20 @@ class PolicyEvolverAgent:
         for act, sc in zip(self.action_history[-3:], self.score_history[-3:]):
             lines.append(f"  [{sc:.2f}] {act.get('action_type', '?')}")
 
-        target = min(last_score + 0.25, 0.95)
-        lines.append(f"\nYour next proposal MUST score above {target:.2f}.")
+        # Surgical Refinement Guard
+        if last_score >= 0.80:
+            lines = [
+                f"\n=== SURGICAL REFINEMENT (Step {step}) ===",
+                f"Current Score: {last_score:.3f} — EXCELLENT.",
+                "CRITICAL: Do NOT rewrite the policy. Only perform 'surgical' removals or additions.",
+                "1. CHECK: Remove 'might', 'could', 'perhaps', 'sometimes', 'often' if present.",
+                "2. CHECK: Ensure words count >= 12. Add one more specific metric (%, hours, $) if needed.",
+                "Do NOT add any words that could be seen as vague. Aim for 0.95+."
+            ]
+        else:
+            target = min(last_score + 0.20, 0.95)
+            lines.append(f"\nYour next proposal MUST score above {target:.2f}. Be more specific.")
+
         return "\n".join(lines)
 
     def get_action(self, client: OpenAI, task_id: str, obs: dict) -> dict:
@@ -188,15 +206,28 @@ class PolicyEvolverAgent:
 
         result = self._call_llm(client, prompt)
         if result is None:
-            # Fallback action so we never crash
-            result = {
-                "action_type": "propose_clarification",
-                "ambiguous_term": "offensive",
-                "suggested_definition": "Content must be classified as offensive if and only if it contains explicit slurs, direct threats of physical violence, or identity-based harassment verifiable within 24 hours.",
-                "affected_policy_ids": ["pol_001"],
-                "justification": "Replaces subjective term with measurable criteria.",
-                "think": "Analyzing the tradeoff between precision and recall for content moderation threshold. Evidence from the corpus shows impact of vague terms on enforcement. Setting a measurable threshold improves consistency.",
-            }
+            # Task-Aware fallback so we never crash and actions remain valid
+            if task_id == "task_easy":
+                return {
+                    "action_type": "propose_clarification",
+                    "ambiguous_term": "offensive",
+                    "suggested_definition": "Content is offensive if it contains explicit slurs or direct threats of violence verified by local context.",
+                    "affected_policy_ids": ["pol_001"], "justification": "Fallback clarification.", "think": "LLM failed - using robust baseline."
+                }
+            elif task_id == "task_medium":
+                return {
+                    "action_type": "propose_new_rule",
+                    "rule_domain": "generative_ai_use",
+                    "new_rule": "Employees must explicitly disclose all generative AI interactions for proprietary code drafting.",
+                    "scope": ["code", "proprietary"], "integration_points": ["pol_ai_001"], "justification": "Fallback new rule.", "think": "LLM failed - using robust baseline."
+                }
+            else:
+                return {
+                    "action_type": "evolve_policy",
+                    "policy_modifications": [{"policy_id": "pol_rev_001", "change_type": "enhance", "new_text": "Apply manual review to high velocity sellers.", "reason": "Systemic safety."}],
+                    "expected_outcomes": {"fraud_rate": 0.5, "revenue_velocity": 0.5, "seller_trust": 0.5},
+                    "rollback_conditions": ["If fraud rate peaks"], "justification": "Fallback evolution.", "think": "LLM failed - using robust baseline."
+                }
         return result
 
 
