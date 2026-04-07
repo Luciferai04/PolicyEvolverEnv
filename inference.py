@@ -25,7 +25,7 @@ from models import Action
 
 # ─── Environment Variables (Hackathon Mandatory) ───
 IMAGE_NAME = os.getenv("IMAGE_NAME")
-API_KEY = os.environ.get("API_KEY")
+API_KEY = os.environ.get("API_KEY") or os.environ.get("HF_TOKEN")
 API_BASE_URL = os.environ.get("API_BASE_URL")
 MODEL_NAME = os.environ.get("MODEL_NAME")
 BENCHMARK = "policy_evolver_env"
@@ -214,14 +214,16 @@ async def run_episode(client: Optional[OpenAI], env: Optional[PolicyEvolverEnv],
     log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
     if setup_error:
+        print(f"[FATAL] Setup Error: {setup_error}", file=sys.stderr)
         log_step(step=1, action="setup", reward=0.0, done=True, error=str(setup_error))
         log_end(task=task_id, success=False, steps=0, score=0.0, rewards=[])
-        return {"task_id": task_id, "reward": 0.0}
+        sys.exit(1)
 
     if not client or not env:
+        print("[FATAL] Client or Environment not initialized", file=sys.stderr)
         log_step(step=1, action="setup", reward=0.0, done=True, error="Client or Environment not initialized")
         log_end(task=task_id, success=False, steps=0, score=0.0, rewards=[])
-        return {"task_id": task_id, "reward": 0.0}
+        sys.exit(1)
 
     agent = PolicyEvolverAgent(MODEL_NAME)
     rewards: List[float] = []
@@ -273,12 +275,15 @@ async def run_episode(client: Optional[OpenAI], env: Optional[PolicyEvolverEnv],
         success = score >= SUCCESS_THRESHOLD
 
     except Exception as e:
+        print(f"[FATAL] Runtime Error: {e}", file=sys.stderr)
         log_step(step=steps_taken + 1, action="error", reward=0.0, done=True, error=str(e))
+        log_end(task=task_id, success=False, steps=steps_taken, score=0.0, rewards=rewards)
+        sys.exit(1)
 
     finally:
-        log_end(task=task_id, success=success, steps=steps_taken, score=score, rewards=rewards)
-
-    return {"task_id": task_id, "reward": score}
+        # We only log_end here if we didn't exit(1) already
+        if not sys.exc_info()[0]:
+            log_end(task=task_id, success=success, steps=steps_taken, score=score, rewards=rewards)
 
 
 # ─── Main Entry Point ───
