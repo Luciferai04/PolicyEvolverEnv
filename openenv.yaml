@@ -79,7 +79,7 @@ endpoints:
     - path: "/tasks"
       method: "GET"
     - path: "/grader"
-      method: "GET"
+      method: "POST"
     - path: "/baseline"
       method: "GET"
   optional:
