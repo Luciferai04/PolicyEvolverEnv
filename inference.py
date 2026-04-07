@@ -41,9 +41,13 @@ if not MODEL_NAME and API_BASE_URL and API_KEY:
         )
         if resp.status_code == 200:
             models_data = resp.json().get("data", [])
-            if models_data:
-                MODEL_NAME = models_data[0].get("id", "gpt-4o-mini")
-                print(f"[DEBUG] Auto-discovered model: {MODEL_NAME}", flush=True)
+            # Filter out wildcards and pick a real model name
+            for m in models_data:
+                mid = m.get("id", "")
+                if mid and mid != "*" and not mid.startswith("*"):
+                    MODEL_NAME = mid
+                    print(f"[DEBUG] Auto-discovered model: {MODEL_NAME}", flush=True)
+                    break
     except Exception as e:
         print(f"[DEBUG] Model discovery failed: {e}", flush=True)
 
