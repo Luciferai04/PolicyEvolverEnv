@@ -103,8 +103,8 @@ def run_baseline_route():
     try:
         env_vars = {
             **os.environ,
-            "HF_TOKEN": os.environ.get("HF_TOKEN", ""),
-            "API_BASE_URL": os.environ.get("API_BASE_URL", "https://api.groq.com/openai/v1"),
+            "API_KEY": os.environ.get("API_KEY", ""),
+            "API_BASE_URL": os.environ.get("API_BASE_URL", ""),
             "MODEL_NAME": os.environ.get("MODEL_NAME", "llama-3.1-8b-instant"),
             "ENV_BASE_URL": "http://127.0.0.1:7860",
         }

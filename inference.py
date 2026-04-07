@@ -24,9 +24,9 @@ from models import Action
 
 # ─── Environment Variables (Hackathon Mandatory) ───
 IMAGE_NAME = os.getenv("IMAGE_NAME")
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
-API_BASE_URL = os.getenv("API_BASE_URL") or "https://api.groq.com/openai/v1"
-MODEL_NAME = os.getenv("MODEL_NAME") or "llama-3.1-8b-instant"
+API_KEY = os.environ.get("API_KEY")
+API_BASE_URL = os.environ.get("API_BASE_URL")
+MODEL_NAME = os.environ.get("MODEL_NAME")
 BENCHMARK = "policy_evolver_env"
 MAX_STEPS = 5
 TEMPERATURE = 0.0
@@ -282,10 +282,9 @@ async def main() -> None:
     try:
         # 1. Initialize OpenAI Client
         try:
-            if not API_KEY or API_KEY == "dummy_key":
-                # In validator, API_KEY might be missing if they didn't pass it yet, but we shouldn't crash
-                pass
-            client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY or "dummy")
+            if not API_KEY or not API_BASE_URL:
+                raise Exception("Missing mandatory environment variables: API_KEY and/or API_BASE_URL")
+            client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
         except Exception as e:
             setup_error = Exception(f"OpenAI client initialization failed: {e}")
 
