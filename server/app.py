@@ -106,7 +106,7 @@ def run_baseline_route():
             "API_KEY": os.environ.get("API_KEY", ""),
             "API_BASE_URL": os.environ.get("API_BASE_URL", ""),
             "MODEL_NAME": os.environ.get("MODEL_NAME", "llama-3.1-8b-instant"),
-            "ENV_BASE_URL": "http://127.0.0.1:7860",
+            "ENV_BASE_URL": "http://127.0.0.1:8000",
         }
         
         result = subprocess.run(
@@ -401,7 +401,7 @@ async def startup_event():
 
 def main():
     # Sync with Hugging Face and local requirements
-    uvicorn.run("server.app:app", host="0.0.0.0", port=7860, reload=False)
+    uvicorn.run("server.app:app", host="0.0.0.0", port=8000, reload=False)
 
 if __name__ == "__main__":
     main()

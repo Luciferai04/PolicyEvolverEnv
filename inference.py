@@ -316,7 +316,7 @@ async def main() -> None:
                     env = PolicyEvolverEnv(base_url=base_url, provider=provider)
                     await env.connect()
                 else:
-                    local_url = os.environ.get("ENV_BASE_URL", "http://127.0.0.1:7860")
+                    local_url = os.environ.get("ENV_BASE_URL", "http://127.0.0.1:8000")
                     env = PolicyEvolverEnv(base_url=local_url)
                     # For local testing, we might want to check connection immediately or let run_episode handle it
             except Exception as e:
