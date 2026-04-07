@@ -305,7 +305,16 @@ async def main() -> None:
         if not setup_error:
             try:
                 if IMAGE_NAME:
-                    env = await PolicyEvolverEnv.from_docker_image(IMAGE_NAME)
+                    # Manually handle Docker startup to override the 30s library default
+                    from openenv.core.containers.runtime.providers import LocalDockerProvider
+                    provider = LocalDockerProvider()
+                    base_url = provider.start_container(IMAGE_NAME)
+                    
+                    print(f"[DEBUG] Waiting for container {IMAGE_NAME} at {base_url} (Extended Timeout 120s)...", flush=True)
+                    provider.wait_for_ready(base_url, timeout_s=120.0)
+                    
+                    env = PolicyEvolverEnv(base_url=base_url, provider=provider)
+                    await env.connect()
                 else:
                     local_url = os.environ.get("ENV_BASE_URL", "http://127.0.0.1:7860")
                     env = PolicyEvolverEnv(base_url=local_url)

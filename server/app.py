@@ -387,9 +387,17 @@ def build_custom_ui():
 
     return demo
 
-# Enable the professional "Judge Ready" console by default
-custom_demo = build_custom_ui()
-app = gr.mount_gradio_app(app, custom_demo, path="/dashboard/")
+# Lazy Gradio UI Mounting
+@app.on_event("startup")
+async def startup_event():
+    import gradio as gr
+    # Import locally to avoid module-level overhead
+    try:
+        custom_demo = build_custom_ui()
+        gr.mount_gradio_app(app, custom_demo, path="/dashboard/")
+        print("[INFO] PolicyEvolver Dashboard mounted at /dashboard/")
+    except Exception as e:
+        print(f"[WARNING] Failed to mount Gradio Dashboard: {e}")
 
 def main():
     # Sync with Hugging Face and local requirements
