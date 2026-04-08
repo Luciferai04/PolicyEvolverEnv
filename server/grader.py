@@ -109,6 +109,17 @@ def grade_clarification(action: ProposeClarificationAction, task: Dict) -> float
     kw_score = score
     base_score = (kw_score * 0.7) + (length_score * 0.3) - vagueness_penalty
 
+    # Enforce measurable keywords rule
+    measurable_kws = [
+        "threshold", "verify", "days", "$", "%",
+        "reports", "hours", "within", "exceed", "minimum",
+        "specifically", "measurable", "if-then", "must", "shall"
+    ]
+    has_measurable = any(k.lower() in defn.lower() for k in measurable_kws)
+    if not has_measurable:
+        # Cap the base score severely so final score + CoT + momentum remains < 0.50
+        base_score = min(base_score, 0.25)
+
     # CoT bonus
     final_score = base_score + cot_bonus(action.think)
 
@@ -199,6 +210,26 @@ def grade_evolution(action: EvolveProcessAction, task: Dict) -> float:
     """
     # 1. Structure Score (30%)
     outcomes = action.expected_outcomes
+    
+    # Normalise common alternative key names to standard names
+    KEY_ALIASES = {
+        "queue_overload":      "revenue_velocity",
+        "revenue_growth":      "revenue_velocity",
+        "revenue":             "revenue_velocity",
+        "fraud_detection":     "fraud_rate",
+        "fraud_detection_rate":"fraud_rate",
+        "fraud":               "fraud_rate",
+        "trust":               "seller_trust",
+        "seller_confidence":   "seller_trust",
+    }
+
+    if isinstance(outcomes, dict):
+        normalised = {}
+        for k, v in outcomes.items():
+            standard_key = KEY_ALIASES.get(k.lower(), k)
+            normalised[standard_key] = v
+        outcomes = normalised
+
     valid_keys = {
         "fraud_rate", "revenue_velocity", "seller_trust",
         "false_positive_rate", "fraud_detection_rate", 
@@ -249,13 +280,35 @@ def grade_evolution(action: EvolveProcessAction, task: Dict) -> float:
             mod_score *= 0.5
 
     hard_base = (
-        structure_score * 0.30 +
-        realism_score   * 0.50 +
-        mod_score       * 0.20
+        structure_score * 0.20 +
+        realism_score   * 0.65 +
+        mod_score       * 0.15
     )
 
     # CoT bonus
     final_score = hard_base + cot_bonus(action.think)
+    
+    # Domain mismatch penalty
+    HARD_DOMAIN_KEYWORDS = [
+        "seller", "merchant", "marketplace", "fraud", "listing",
+        "buyer", "shipment", "return", "velocity", "payment",
+        "review", "refund", "inventory", "drop.?ship", "fulfil"
+    ]
+    import re as _re
+    full_text = (
+        action.justification + " " +
+        " ".join(
+            mod.new_text
+            for mod in action.policy_modifications
+        )
+    ).lower()
+    domain_hits = sum(
+        1 for kw in HARD_DOMAIN_KEYWORDS
+        if _re.search(kw, full_text)
+    )
+    domain_penalty = 0.30 if domain_hits == 0 else 0.0
+    
+    final_score -= domain_penalty
 
     return round(max(0.0, min(1.0, final_score)), 4)
 
@@ -368,72 +421,209 @@ if __name__ == "__main__":
         "will impact seller trust. Therefore I balance it."
     ) == 0.20
     print(" ✓ Chain-of-Thought mathematical bounds verified.")
+    print("CoT bonus tests passed")
 
     print("\n[Phase 2] Easy Task: Progression & Score Delta")
     # Simulate an agent progressively improving their classification
-    easy_step_1 = grade({
+    
+    step1_action = {"action_type": "propose_clarification", "ambiguous_term": "offensive", "suggested_definition": "bad behavior", "justification": "", "think": ""}
+    step2_action = {
         "action_type": "propose_clarification", 
         "ambiguous_term": "offensive", 
-        "suggested_definition": "bad behavior", 
-        "justification": "", 
+        "suggested_definition": (
+            "Content is defined as offensive if it includes explicit "
+            "slurs and directly degrades community members."
+        ),
+        "justification": "The current policy leads to inconsistent moderation.",
         "think": ""
-    }, "task_easy", previous_score=0.0)
-    
-    easy_step_2 = grade({
-        "action_type": "propose_clarification", 
-        "ambiguous_term": "offensive", 
-        "suggested_definition": "Content is defined as offensive if it includes explicit slurs and directly degrades community members.", 
-        "justification": "The current policy leads to inconsistent moderation.", 
-        "think": ""
-    }, "task_easy", previous_score=easy_step_1)
-    
-    easy_step_3 = grade({
+    }
+    step3_action = {
         "action_type": "propose_clarification", 
         "ambiguous_term": "appropriate", 
-        "suggested_definition": "Behavior is defined as appropriate when it specifically follows the community guidelines, meaning it does not include excessive slurs and meets the 5% threshold for verified user reports.", 
+        "suggested_definition": (
+            "Behavior is defined as a violation when it specifically "
+            "includes 3 or more verified reports within 24 hours, "
+            "exceeding the 5% threshold for category violations. "
+            "Must meet measurable community standards."
+        ),
         "justification": "The current policy leads to inconsistent and subjective moderation because it is unclear and varies between interpreters.", 
-        "think": "Because the threshold is too low, the tradeoff between precision and recall creates a false positive risk that will impact seller trust. Therefore I balance it."
-    }, "task_easy", previous_score=max(easy_step_1, easy_step_2))
-    
-    print(f" > Step 1 (Poor Action) : Score = {easy_step_1:.4f}")
-    print(f" > Step 2 (Med Action)  : Score = {easy_step_2:.4f}")
-    print(f" > Step 3 (High Action) : Score = {easy_step_3:.4f}")
-    if easy_step_1 < easy_step_2 < easy_step_3:
-        print(" ✓ Reward shaping successfully proves progressive skill improvement.")
-    else:
-        print(" ! Warning: Reward did not strictly improve.")
+        "think": (
+            "Because the threshold is too low, the tradeoff between "
+            "precision and recall creates a false positive risk that "
+            "will impact community trust. Therefore I balance the "
+            "evidence requirement."
+        )
+    }
+
+    s1 = grade(step1_action, "task_easy", previous_score=0.0)
+    s2 = grade(step2_action, "task_easy", previous_score=s1)
+    s3 = grade(step3_action, "task_easy", previous_score=s2)
+
+    print(f"Step 1: {s1:.4f}")
+    print(f"Step 2: {s2:.4f}")
+    print(f"Step 3: {s3:.4f}")
+
+    assert s1 < 0.30, f"Step 1 should be low, got {s1}"
+    assert s2 > s1,   f"Step 2 should improve over step 1"
+    assert s2 < 0.60, f"Step 2 (no keywords) should be below 0.60, got {s2}"
+    assert s3 > 0.80, f"Step 3 should be high, got {s3}"
+    assert s3 > s2,   f"Step 3 should improve over step 2"
+    print("Easy progression tests passed")
 
     print("\n[Phase 3] Hard Task: Hallucination & Tradeoff Simulation")
-    hallucination = {
+    hallucination_action = {
         "action_type": "evolve_policy",
-        "policy_modifications": [{"policy_id": "p1", "change_type": "enhance", "new_text": "test", "reason": "test"}],
-        "expected_outcomes": {"fraud_detection_rate": 0.95, "legitimate_revenue_lost": 0.95, "seller_trust_score": 0.95},
-        "justification": "We improve everything simultaneously.",
+        "policy_modifications": [{"policy_id": "p1", "change_type": "enhance",
+                          "new_text": "test", "reason": "test"}],
+        "expected_outcomes": {
+            "fraud_rate": 0.95,
+            "revenue_velocity": 0.95,
+            "seller_trust": 0.95
+        },
+        "justification": "All metrics improve simultaneously.",
         "think": ""
     }
-    h_score = grade(hallucination, "task_hard", previous_score=0.0)
+    h_score = grade(hallucination_action, "task_hard")
     print(f" > Hallucinated 'All High' Outcomes Penalty Applied: Score = {h_score:.4f}")
-    assert h_score <= 0.5, "Hallucination penalty failed."
-
-    realistic = {
+    assert h_score <= 0.30, f"Hallucination scored {h_score}, must be <= 0.30"
+    print(f"Hard hallucination confirmed: {h_score}")
+    
+    canonical_action = {
         "action_type": "evolve_policy",
         "policy_modifications": [
-            {"policy_id": "ts_pol_001", "change_type": "enhance", "new_text": "Apply manual review for high-velocity new sellers.", "reason": "Targeting fraud spikes."},
-            {"policy_id": "ts_pol_002", "change_type": "add", "new_text": "Legacy sellers exempt from new velocity checks.", "reason": "Reduce false positives."}
+            {"policy_id": "p1", "change_type": "enhance",
+             "new_text": "Apply velocity checks.", "reason": "fraud"},
+            {"policy_id": "p2", "change_type": "add",
+             "new_text": "Exempt legacy sellers.", "reason": "FP reduction"}
         ],
-        "expected_outcomes": {"fraud_detection_rate": 0.75, "review_queue_overload": 0.40, "seller_trust_score": 0.60},
-        "justification": "Balancing precision and recall by isolating high-volume risk categories.",
-        "think": "Because improving fraud_rate will impact revenue_velocity negatively, I balance the tradeoff by exempting trusted sellers. The threshold for velocity checks optimizes recall without false positive spikes."
+        "expected_outcomes": {
+            "fraud_rate": 0.75,
+            "revenue_velocity": 0.40,
+            "seller_trust": 0.55
+        },
+        "justification": "Balancing fraud detection against revenue.",
+        "think": (
+            "Because improving fraud detection creates a tradeoff "
+            "with revenue velocity, I balance the threshold to optimise "
+            "precision and recall without false positive spikes."
+        )
     }
-    r_score = grade(realistic, "task_hard", previous_score=0.0)
+    r_score = grade(canonical_action, "task_hard")
     print(f" > Realistic Tradeoff & Math Variance Award Applied: Score = {r_score:.4f}")
-    assert r_score > 0.65, "Realistic tradeoff award failed."
-    print(" ✓ Strategic balancing logic functions correctly.")
+    assert r_score > 0.65, f"Realistic tradeoff should score high, got {r_score}"
+    print(f"Hard strategic agent confirmed: {r_score}")
+    
+    # Test with alias key
+    alias_action = {
+        "action_type": "evolve_policy",
+        "policy_modifications": [
+            {"policy_id": "p1", "change_type": "enhance",
+             "new_text": "Apply velocity checks.", "reason": "fraud"},
+            {"policy_id": "p2", "change_type": "add",
+             "new_text": "Exempt legacy sellers.", "reason": "FP reduction"}
+        ],
+        "expected_outcomes": {
+            "fraud_detection": 0.75,    # alias for fraud_rate
+            "queue_overload": 0.40,     # alias for revenue_velocity
+            "seller_confidence": 0.55   # alias for seller_trust
+        },
+        "justification": "Balancing fraud detection against revenue.",
+        "think": (
+            "Because improving fraud detection creates a tradeoff "
+            "with revenue velocity, I balance the threshold to optimise "
+            "precision and recall without false positive spikes."
+        )
+    }
+    a_score = grade(alias_action, "task_hard")
+    assert a_score > 0.60, f"Alias keys should work, got {a_score}"
+    assert abs(r_score - a_score) < 0.05, f"Alias and canonical should score similarly: {a_score} vs {r_score}"
 
-    print("\n[Phase 4] System Determinism Sanity Check")
-    tc = {"task_id": "task_medium", "action": {"rule_domain": "AI_use", "new_rule": "Employees must explicitly disclose AI.", "scope": ["chat"], "justification": "leakage.", "think": "gap."}}
-    scores = [grade(tc["action"], tc["task_id"]) for _ in range(3)]
-    assert scores[0] == scores[1] == scores[2], f"NON-DETERMINISTIC: {scores}"
-    print(f" ✓ Determinism verified (x3 runs yielded Score: {scores[0]}).")
+    print("\n[Phase 4] Cross-Domain Penalty")
+    cross_domain_action = {
+        "action_type": "evolve_policy",
+        "policy_modifications": [
+            {"policy_id": "pol_ai_001", "change_type": "enhance",
+             "new_text": "Employees must disclose AI usage in proposals.",
+             "reason": "AI governance gap"}
+        ],
+        "expected_outcomes": {
+            "fraud_rate": 0.60,
+            "revenue_velocity": 0.40,
+            "seller_trust": 0.55
+        },
+        "justification": (
+            "Employees using generative AI must disclose usage to "
+            "prevent intellectual property violations."
+        ),
+        "think": "AI governance policy needed for workplace compliance."
+    }
+
+    cross_score = grade(cross_domain_action, "task_hard")
+    assert cross_score < 0.35, f"Cross-domain action should score low, got {cross_score}"
+    print(f"Cross-domain penalty confirmed: {cross_score}")
+
+    print("\n[Phase 5] Anti-Repetition Penalty")
+    from server.environment import PolicyEvolverEnvironment
+    env = PolicyEvolverEnvironment()
+    env.reset(task_id="task_easy")
+
+    repeat_action_dict = {
+        "action_type": "propose_clarification",
+        "ambiguous_term": "offensive",
+        "suggested_definition": (
+            "Behavior exceeding 3 reports within 24 hours is a violation."
+        ),
+        "justification": "Clear standards.",
+        "think": "Standard threshold applied."
+    }
+
+    import copy
+    result1 = env.step(copy.deepcopy(repeat_action_dict))
+    result2 = env.step(copy.deepcopy(repeat_action_dict))
+
+    score1 = result1.reward
+    score2 = result2.reward
+
+    assert score2 < score1, (
+        f"Repeated action should score lower. "
+        f"First: {score1}, Second: {score2}"
+    )
+    assert score1 - score2 >= 0.25, (
+        f"Repetition penalty should be at least 0.25. "
+        f"Difference: {score1 - score2:.3f}"
+    )
+    print(f"Anti-repetition confirmed: {score1:.3f} → {score2:.3f}")
+
+    print("\n[Phase 6] System Determinism Sanity Check")
+    determinism_action = {
+        "action_type": "propose_clarification",
+        "ambiguous_term": "offensive",
+        "suggested_definition": (
+            "Behavior exceeding 3 verified reports within 24 hours, "
+            "specifically meeting the 5% threshold for violations."
+        ),
+        "justification": "Clear and measurable standards.",
+        "think": (
+            "Because the threshold requires precision, I balance "
+            "recall against false positive risk. Evidence from corpus "
+            "supports this measurable criterion."
+        )
+    }
+
+    scores_easy = [
+        grade(determinism_action, "task_easy")
+        for _ in range(3)
+    ]
+    assert scores_easy[0] == scores_easy[1] == scores_easy[2], f"Easy task non-deterministic: {scores_easy}"
+    print(f"Easy determinism: {scores_easy[0]} ✓")
+
+    scores_hard = [
+        grade(canonical_action, "task_hard")
+        for _ in range(3)
+    ]
+    assert scores_hard[0] == scores_hard[1] == scores_hard[2], f"Hard task non-deterministic: {scores_hard}"
+    print(f"Hard determinism: {scores_hard[0]} ✓")
+    
     print("\n==================================================")
-    print(" All Professional Tests Passed Successfully.")
+    print(" All determinism checks passed.")
+
