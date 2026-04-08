@@ -199,21 +199,28 @@ def grade_evolution(action: EvolveProcessAction, task: Dict) -> float:
     """
     # 1. Structure Score (30%)
     outcomes = action.expected_outcomes
-    required_keys = ["fraud_rate", "revenue_velocity", "seller_trust"]
-    keys_present = sum(1 for k in required_keys if k in outcomes)
-    structure_score = keys_present / len(required_keys)
+    valid_keys = {
+        "fraud_rate", "revenue_velocity", "seller_trust",
+        "false_positive_rate", "fraud_detection_rate", 
+        "seller_trust_score", "review_queue_overload", 
+        "legitimate_revenue_lost"
+    }
+    
+    present_valid_keys = [k for k in outcomes.keys() if k in valid_keys]
+    keys_present = len(present_valid_keys)
+    structure_score = min(keys_present / 3.0, 1.0)
 
     # 2. Tradeoff Realism Check (50%)
     realism_score = 0.5  # default
-    if keys_present == 3:
+    if keys_present >= 3:
         values = []
-        for k in required_keys:
+        for k in present_valid_keys:
             v = outcomes[k]
             # Normalise: accept 0-1 floats OR 0-100 integers
             if isinstance(v, (int, float)):
                 values.append(float(v) if v <= 1.0 else float(v) / 100.0)
 
-        if len(values) == 3:
+        if len(values) >= 3:
             all_high = all(v > 0.7 for v in values)
             all_positive = all(v > 0 for v in values)
 
