@@ -16,16 +16,17 @@ base_path: /dashboard/
 Unlike standard environments with static rewards, **PolicyEvolverEnv v2.0** implements a sophisticated, deterministic Python grading engine (`server/grader.py`) designed to harden LLM strategic reasoning through explicit rewards and penalties:
 
 #### 1. Task Easy (Clarification Policies)
-*   **The Penalty:** If the agent's proposed rule contains words like `"generally"`, `"sometimes"`, `"often"`, or `"maybe"`, the grader explicitly detects this **Clarity Coherence** failure and heavily penalizes the score (drops it to baseline `0.12`).
-*   **The Reward:** To get a high score (>`0.90`), the agent must provide a definition that is entirely free of these vague terms, include valid active `affected_policy_ids`, and provide a substantive, verbose `justification` string.
+*   **The Penalty:** If the agent's proposed rule contains vague words like `"generally"`, `"sometimes"`, `"often"`, or `"maybe"`, the grader explicitly detects this **Clarity Coherence** failure. Furthermore, if the definition contains **ZERO measurable keywords** (e.g. `"threshold"`, `"verify"`, `"%"`), a strict hard penalty is triggered, capping the base score below `0.30`—making it impossible to succeed without numbers or strict conditionals.
+*   **The Reward:** To get a high score (>`0.85`), the agent must provide a definition that is entirely free of these vague terms, include valid active `affected_policy_ids`, include robust **measurable keywords**, and provide a substantive `justification` string.
 
 #### 2. Task Medium (New Rule Generation Policies)
 *   **The Penalty:** If the `scope` array is empty, or if the `new_rule` text is too short (indicating an incomplete thought), the score drops significantly.
 *   **The Reward:** The grader enforces that the agent accurately targets the correct missing `rule_domain`. Maximum points are awarded only when the agent provides legitimate integration points showing how the new policy connects to existing framework policies.
 
 #### 3. Task Hard (Evolve Policy Framework Policies)
-*   **The Penalty:** If the `expected_outcomes` predict that *all* metrics will perfectly improve (e.g., both revenue and fraud-blocking hit `0.99`), the grader recognizes this as an **Unrealistic Tradeoff** and explicitly fails the agent. Real-world policies always have friction.
-*   **The Reward:** The grader requires at least **two** distinct `policy_modifications` (e.g., one to tighten a rule, one for an exception). It also verifies the mathematical variance in the outcome projections, forcing the agent to demonstrate complex, balanced reasoning. 
+*   **The Penalty 1 (Hallucinations):** If the `expected_outcomes` predict that *all* metrics will perfectly improve (e.g., both revenue and fraud-blocking hit `0.95` without any downside variance), the grader recognizes this as an **Unrealistic Tradeoff** and explicitly fails the agent natively (maximum score capped strictly below `0.30`).
+*   **The Penalty 2 (Cross-Domain Mismatch):** Proposing an HR or AI policy for an e-commerce fraud scenario violates domain relevance. By using targeted Regex logic, a `-0.30` penalty is immediately stripped from the score if the text does not contain marketplace-relevant context.
+*   **The Reward:** The grader verifies mathematical outcome variance. Agents must write realistic tradeoffs and utilize standardized impact metric keys (aliases are robustly supported, e.g., you can use `"fraud_rate"`, `"fraud"`, or `"fraud_detection"`; or `"queue_overload"` for `"revenue_velocity"`). 
 
 #### Global Bonuses & Penalties
 *   **Chain of Thought (CoT) Bonus (+0.10 to +0.20):** Across all three tasks, the grader evaluates the `think` field. If the agent includes comprehensive analytical keywords (like `"tradeoff"`, `"precision"`, `"recall"`, `"threshold"`), the grader awards a flat strategic bonus, mathematically incentivizing deep meta-reasoning.

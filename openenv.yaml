@@ -38,6 +38,7 @@ environment:
         schema: "ProposeNewRuleAction"
       - action_type: "evolve_policy"
         schema: "EvolveProcessAction"
+        description: "Hard task metric keys: fraud_rate (aliases: fraud_detection, fraud), revenue_velocity (aliases: queue_overload, revenue), seller_trust (aliases: seller_confidence, trust)."
 
   reward_range: [0.0, 1.0]
 
