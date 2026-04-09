@@ -37,6 +37,49 @@ def cot_bonus(think: str) -> float:
 
 
 # ─────────────────────────────────────────────
+# Profound Exploit Guards
+# ─────────────────────────────────────────────
+
+def instruction_guard_penalty(text: str) -> float:
+    """Detects prompt injection or system override attempts."""
+    if not text:
+        return 0.0
+    # Search for common injection patterns
+    injection_patterns = [
+        r"ignore prev", r"system_prompt", r"reward\s*=\s*1", 
+        r"override", r"admin access", r"bypass", r"strictly follow",
+        r"act as", r"you are a grader"
+    ]
+    for pattern in injection_patterns:
+        if re.search(pattern, text.lower()):
+            logger.warning(f"[EXPLOIT] InstructionGuard triggered for pattern: {pattern}")
+            return 0.8  # Heavy penalty subtracted from score
+    return 0.0
+
+def semantic_density_penalty(text: str) -> float:
+    """Detects 'word stuffing' / 'fluffing' by checking keyword density."""
+    if not text:
+        return 0.0
+    words = text.split()
+    if len(words) < 100:
+        return 0.0  # Only check longer texts
+    
+    measurable_kws = [
+        "threshold", "verify", "days", "$", "%",
+        "reports", "hours", "within", "exceed", "minimum",
+        "specifically", "measurable", "if-then", "must", "shall"
+    ]
+    kw_hits = sum(1 for k in measurable_kws if k.lower() in text.lower())
+    density = kw_hits / (len(words) / 50.0) # Relative to "packets" of 50 words
+    
+    if len(words) > 200 and density < 0.1:
+        logger.warning(f"[EXPLOIT] SemanticDensityCheck triggered. Word count: {len(words)}, Density hit: {density:.2f}")
+        return 0.3  # Penalty for low-value verbose text
+    return 0.0
+
+
+
+# ─────────────────────────────────────────────
 # Easy Task: Ambiguity Clarification
 # ─────────────────────────────────────────────
 
@@ -123,6 +166,12 @@ def grade_clarification(action: ProposeClarificationAction, task: Dict) -> float
     # CoT bonus
     final_score = base_score + cot_bonus(action.think)
 
+    # Apply Exploit Guards
+    exploit_penalty = instruction_guard_penalty(defn + " " + action.justification + " " + action.think)
+    density_penalty = semantic_density_penalty(defn)
+    
+    final_score -= (exploit_penalty + density_penalty)
+
     return round(max(0.0, min(1.0, final_score)), 4)
 
 
@@ -194,7 +243,13 @@ def grade_new_rule(action: ProposeNewRuleAction, task: Dict) -> float:
     # CoT bonus
     score += cot_bonus(action.think)
 
-    return round(min(score, 1.0), 4)
+    # Apply Exploit Guards
+    exploit_penalty = instruction_guard_penalty(rule + " " + action.justification + " " + action.think)
+    density_penalty = semantic_density_penalty(rule)
+    
+    score -= (exploit_penalty + density_penalty)
+
+    return round(max(0.0, min(1.0, score)), 4)
 
 
 # ─────────────────────────────────────────────
@@ -309,6 +364,22 @@ def grade_evolution(action: EvolveProcessAction, task: Dict) -> float:
     domain_penalty = 0.30 if domain_hits == 0 else 0.0
     
     final_score -= domain_penalty
+
+    # Apply Exploit Guards
+    exploit_penalty = instruction_guard_penalty(full_text + " " + action.think)
+    density_penalty = semantic_density_penalty(full_text)
+    
+    # Logical Alignment Check: Metric Keys vs Mod Content
+    alignment_penalty = 0.0
+    mod_text_full = " ".join(m.new_text.lower() for m in action.policy_modifications).lower()
+    
+    # Check if they change returns but only talk about fraud
+    if "return" in mod_text_full or "refund" in mod_text_full:
+        if not any(k in outcomes for k in ["legitimate_revenue_lost", "seller_trust"]):
+            alignment_penalty += 0.15
+            logger.warning("[EXPLOIT] LogicalAlignmentCheck: Modification on 'returns' but missing outcome metrics.")
+
+    final_score -= (exploit_penalty + density_penalty + alignment_penalty)
 
     return round(max(0.0, min(1.0, final_score)), 4)
 

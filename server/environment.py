@@ -101,6 +101,10 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
         if self._current_task is None:
             raise RuntimeError("Call reset() before step()")
 
+        if self._state.step_count >= self._state.max_steps:
+             logger.warning(f"[EXPLOIT] Step-count limit exceeded for episode {self._state.episode_id}")
+             return self.reset(task_id=self._state.task_id) # Force reset if they keep pushing or return an empty observation
+        
         self._state.step_count += 1
 
         # action can be a dict from the API or a Pydantic model
