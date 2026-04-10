@@ -5,6 +5,7 @@ All functions return float in [0.0, 1.0].
 """
 from __future__ import annotations
 import re
+import copy
 import logging
 from typing import Dict, List, Any
 from models import (
@@ -424,10 +425,9 @@ def grade_evolution(action: EvolveProcessAction, task: Dict) -> float:
         "buyer", "shipment", "return", "velocity", "payment",
         "review", "refund", "inventory", "drop.?ship", "fulfil"
     ]
-    import re as _re
     domain_hits = sum(
         1 for kw in HARD_DOMAIN_KEYWORDS
-        if _re.search(kw, full_text)
+        if re.search(kw, full_text)
     )
     domain_penalty = 0.30 if domain_hits == 0 else 0.0
     
@@ -716,7 +716,6 @@ if __name__ == "__main__":
         "think": "Standard threshold applied."
     }
 
-    import copy
     result1 = env.step(copy.deepcopy(repeat_action_dict))
     result2 = env.step(copy.deepcopy(repeat_action_dict))
 

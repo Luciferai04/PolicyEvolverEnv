@@ -10,6 +10,8 @@ base_path: /dashboard/
 
 **PolicyEvolverEnv** is an OpenEnv-compliant reinforcement learning environment designed for the **Meta × PyTorch × Scaler Hackathon**. It serves as a production-grade benchmark for demonstrating in-context policy improvement using RLVR signals — no weight updates required, making the environment compute-efficient and immediately deployable.
 
+> **Why this matters:** Meta's Oversight Board reviewed 300K+ content appeals in 2024 due to vague community standards. Amazon's marketplace loses an estimated $700M/year to false-positive seller suspensions. PolicyEvolverEnv directly addresses this gap by training agents to replace subjective governance terms with measurable, enforceable thresholds — turning policy ambiguity into a solvable optimization problem.
+
 ---
 
 ### Advanced Reward Shaping (RLVR Integration)
@@ -178,22 +180,6 @@ The agent uses **In-Context Reinforcement Learning (ICL-RL)**: no weight updates
 **Model:** llama-3.1-8b-instant (via Groq)  
 **Reproducible:** temperature=0.0, seed=42 (**Bit-for-bit identical results verified**)  
 **No fine-tuning required.** The environment provides the learning signal; the model adapts its in-context policy each step.
-
-## Setup
-
-### Required Environment Variables
-
-| Variable | Description | Example |
-|---|---|---|
-| HF_TOKEN | API key for LLM inference (Groq) | gsk_... |
-| API_BASE_URL | Provider endpoint | https://api.groq.com/openai/v1 |
-| MODEL_NAME | Model identifier | llama-3.1-8b-instant |
-
-### Getting a Free Groq API Key
-1. Go to [console.groq.com](https://console.groq.com)
-2. Sign up (no credit card required)
-3. API Keys → Create API Key
-4. Export: `export HF_TOKEN=gsk_your_key_here`
 
 ## Strategic Reward Evolution & RLVR
 PolicyEvolverEnv serves as the **Strategic Sandbox** for the **Reinforcement Learning from Verifiable Rewards (RLVR)** stage of the modern LLM inference pipeline. Unlike static evaluation, this environment enables agents to refine their strategies iteratively based on high-quality, verifiable feedback.

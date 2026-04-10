@@ -141,26 +141,38 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
         action_type = action_dict.get("action_type", "unknown") if isinstance(action_dict, dict) else "unknown"
         self._state.actions_taken.append(action_type)
 
-        # Fix 2: Stateful Corpus Updates Based on Score
+        # Reactive Corpus: Prioritize items relevant to the agent's action domain
+        # This makes the world visibly react to agent choices
         target_term = action_dict.get("ambiguous_term") or action_dict.get("rule_domain") or ""
+        t_term = str(target_term).lower()
+
+        # Partition: relevant items first, then remaining
+        relevant = []
+        remaining = []
         for item in self._episode_corpus:
-            # For this hackathon, we apply state changes based on generic keyword matching or domain handling
-            # If target_term is in the content or properties, we update. 
-            # Alternatively, if hard task, update broadly.
             c_type = str(item.get("type", "")).lower()
             c_text = str(item.get("content", "")).lower()
-            t_term = str(target_term).lower()
-            
-            # Simple heuristic mapping
+
+            # Update system_action based on reward (stateful corpus)
             if t_term in c_text or t_term in c_type or action_type == "evolve_policy":
                 if reward >= 0.7:
                     item["system_action"] = "policy_applied"
                 elif 0.3 <= reward < 0.7:
                     item["system_action"] = "flagged"
-                elif reward < 0.3:
-                    pass # leave as pending
-        
-        shown_corpus = self._episode_corpus[:10]
+
+            # Sort into buckets
+            if t_term and (t_term in c_text or t_term in c_type):
+                relevant.append(item)
+            else:
+                remaining.append(item)
+
+        # Rotate the remaining window by step count so agent sees fresh data each step
+        step_offset = (self._state.step_count - 1) * 3
+        rotated_remaining = remaining[step_offset:] + remaining[:step_offset]
+
+        # Build shown corpus: relevant items first, then rotated remaining, cap at 10
+        prioritized_corpus = relevant + rotated_remaining
+        shown_corpus = prioritized_corpus[:10]
 
         done = (
             reward >= 0.90 or
