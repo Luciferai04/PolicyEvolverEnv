@@ -65,6 +65,13 @@ MEDIUM_TASK = {
         {"id": "med_edge_003", "type": "security", "content": "Employee using a corporate laptop for high-risk crypto-mining", "system_action": "pending"},
         {"id": "med_edge_004", "type": "data_sovereignty", "content": "EU client data stored on a server in a region without adequacy", "system_action": "pending"},
         {"id": "med_edge_005", "type": "ethics", "content": "AI system used to predict which employees are likely to quit", "system_action": "pending"},
+        
+        # Red Herrings (Noise for Staff-Level filtering)
+        {"id": "med_noise_001", "type": "office_perks", "content": "Employee inquired if the company gym membership covers family members", "system_action": "pending"},
+        {"id": "med_noise_002", "type": "facilities", "content": "The ergonomics of the 2nd floor desk chairs need adjustment", "system_action": "pending"},
+        {"id": "med_noise_003", "type": "it_admin", "content": "Reminder: All passwords must be updated every 90 days. Next cycle starts Monday.", "system_action": "pending"},
+        {"id": "med_noise_004", "type": "social", "content": "The 'Summer Jam' internal coding contest is now accepting entries until Friday.", "system_action": "pending"},
+        {"id": "med_noise_005", "type": "facilities", "content": "Request: Can we add more oat milk to the fridge in the south wing kitchen?", "system_action": "pending"},
     ],
     "current_policies": [
         {"id": "pol_hr_001", "text": "Employees must maintain confidentiality of client information at all times."},
@@ -72,8 +79,10 @@ MEDIUM_TASK = {
         {"id": "pol_hr_003", "text": "Contractors must sign an NDA before beginning any project."},
         {"id": "pol_hr_004", "text": "Employees working remotely must have a secure, dedicated workspace."},
         {"id": "pol_hr_005", "text": "Any intellectual property created during employment belongs to the company."},
+        {"id": "pol_med_noise_01", "text": "Printers shall default to black-and-white, double-sided printing to save resources."}, # Noise Policy
     ],
     "uncovered_domains": ["AI_use", "gig_worker_post_engagement", "cross_border_remote", "mental_health_governance"],
-    "num_policies": 5,
-    "num_data_points": 50,
+    "red_herrings": ["gym", "chairs", "password", "Summer Jam", "contest", "oat milk", "printers", "recycled paper"],
+    "num_policies": 6,
+    "num_data_points": 55,
 }

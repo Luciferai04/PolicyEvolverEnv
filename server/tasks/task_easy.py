@@ -43,14 +43,21 @@ EASY_TASK = {
         {"id": "gig_008", "type": "gig_worker", "content": "Contractor accessed sensitive HR server for 'formatting ideas'", "system_action": "pending"},
         {"id": "gig_009", "type": "gig_worker", "content": "Temp staff member wearing competitor's merch in office", "system_action": "pending"},
         {"id": "gig_010", "type": "gig_worker", "content": "Freelancer claimed 80 hours of work for 20 actual hours", "system_action": "pending"},
+        # Red Herrings (Noise for Staff-Level filtering)
+        {"id": "noise_001", "type": "staff_social", "content": "Employee asked on Slack if anyone wants to order pizza", "system_action": "pending"},
+        {"id": "noise_002", "type": "office_infra", "content": "The coffee machine in the 3rd floor breakroom is leaking", "system_action": "pending"},
+        {"id": "noise_003", "type": "social_event", "content": "Reminder: The annual company picnic is next Friday at 2 PM", "system_action": "pending"},
+        {"id": "noise_004", "type": "it_notice", "content": "Scheduled maintenance on the internal portal this Sunday at 1 AM", "system_action": "pending"},
     ],
     "current_policies": [
         {"id": "pol_wplace_001", "text": "Employees must use AI tools in an appropriate and ethical manner."},
         {"id": "pol_wplace_002", "text": "Remote work environments must be reasonable and professional."},
         {"id": "pol_wplace_003", "text": "Gig workers should maintain a respectful relationship with firm intellectual property."},
         {"id": "pol_wplace_004", "text": "Substantial use of external automation requires management approval."},
+        {"id": "pol_noise_999", "text": "The company mascot 'OpenBot' shall always be depicted wearing a blue tie in internal slides."}, # Noise Policy
     ],
     "known_ambiguous_terms": ["appropriate", "ethical", "reasonable", "professional", "respectful", "substantial"],
-    "num_policies": 4,
-    "num_data_points": 30,
+    "red_herrings": ["pizza", "coffee machine", "picnic", "mascot", "blue tie", "lunch", "weather"],
+    "num_policies": 5,
+    "num_data_points": 34,
 }

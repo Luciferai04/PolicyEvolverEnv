@@ -77,6 +77,45 @@ def semantic_density_penalty(text: str) -> float:
         return 0.3  # Penalty for low-value verbose text
     return 0.0
 
+def segmented_prioritization_check(text: str, keywords: List[str]) -> float:
+    """
+    Rewards agents for placing mission-critical keywords in the early 
+    segments of their communication.
+    """
+    if not text or not keywords:
+        return 0.0
+    
+    words = text.split()
+    if len(words) < 20: 
+        return 0.0
+        
+    # Standard staff-level requirement: Leading with the fix (First 25%)
+    head_len = max(5, int(len(words) * 0.25))
+    head_text = " ".join(words[:head_len]).lower()
+    
+    found_in_head = any(kw.lower() in head_text for kw in keywords)
+    
+    if found_in_head:
+        return 0.15 # Staff bonus for clear prioritization
+    return -0.10 # Senior penalty for burying the lede
+
+def signal_to_noise_ratio_penalty(text: str, red_herrings: List[str]) -> float:
+    """
+    Penalizes agents for including irrelevant 'Red Herring' topics.
+    """
+    if not text or not red_herrings:
+        return 0.0
+    
+    text_lower = text.lower()
+    noise_hits = sum(1 for rh in red_herrings if rh.lower() in text_lower)
+    
+    if noise_hits > 0:
+        # Increase penalty: -0.25 per hit, up to 0.75 (tanking the score)
+        penalty = min(noise_hits * 0.25, 0.75)
+        logger.warning(f"[REDUNDANCY] RedHerring detected. Noise hits: {noise_hits}, Penalty: {penalty}")
+        return penalty
+    return 0.0
+
 
 
 # ─────────────────────────────────────────────
@@ -130,6 +169,11 @@ def grade_clarification(action: ProposeClarificationAction, task: Dict) -> float
         just_score += 0.10
     score += min(just_score, 0.20)
 
+    # NEW: Staff-Level Segmented Evaluation
+    # Measure priority in definition vs justification
+    prio_bonus = segmented_prioritization_check(defn + " " + action.justification, known + ["specifically", "threshold"])
+    score += prio_bonus
+
     # Length coherence score
     word_count = len(defn.split())
     if word_count < 10:
@@ -138,6 +182,10 @@ def grade_clarification(action: ProposeClarificationAction, task: Dict) -> float
         length_score = 0.6
     else:
         length_score = 1.0
+
+    # NEW: Red Herring Penalty (Easy)
+    red_herrings = task.get("red_herrings", ["spelling", "formatting", "font", "css"])
+    noise_hit = signal_to_noise_ratio_penalty(defn + " " + action.justification, red_herrings)
 
     # Vagueness penalty
     vague_words = [
@@ -150,7 +198,7 @@ def grade_clarification(action: ProposeClarificationAction, task: Dict) -> float
     vagueness_penalty = min(vague_hits * 0.1, 0.3)
 
     kw_score = score
-    base_score = (kw_score * 0.7) + (length_score * 0.3) - vagueness_penalty
+    base_score = (kw_score * 0.7) + (length_score * 0.3) - vagueness_penalty - noise_hit
 
     # Enforce measurable keywords rule
     measurable_kws = [
@@ -170,7 +218,8 @@ def grade_clarification(action: ProposeClarificationAction, task: Dict) -> float
     exploit_penalty = instruction_guard_penalty(defn + " " + action.justification + " " + action.think)
     density_penalty = semantic_density_penalty(defn)
     
-    final_score -= (exploit_penalty + density_penalty)
+    # Noise penalty is applied at the very end to ensure it's not diluted
+    final_score -= (exploit_penalty + density_penalty + noise_hit)
 
     return round(max(0.0, min(1.0, final_score)), 4)
 
@@ -242,6 +291,15 @@ def grade_new_rule(action: ProposeNewRuleAction, task: Dict) -> float:
 
     # CoT bonus
     score += cot_bonus(action.think)
+
+    # NEW: Staff-Level Segmented Evaluation
+    prio_bonus = segmented_prioritization_check(rule + " " + action.justification, [action.rule_domain, "gap", "new rule"])
+    score += prio_bonus
+
+    # NEW: Red Herring Penalty (Medium)
+    red_herrings = task.get("red_herrings", ["formatting", "font", "css", "color_scheme"])
+    noise_hit = signal_to_noise_ratio_penalty(rule + " " + action.justification, red_herrings)
+    score -= noise_hit
 
     # Apply Exploit Guards
     exploit_penalty = instruction_guard_penalty(rule + " " + action.justification + " " + action.think)
@@ -342,6 +400,23 @@ def grade_evolution(action: EvolveProcessAction, task: Dict) -> float:
 
     # CoT bonus
     final_score = hard_base + cot_bonus(action.think)
+
+    full_text = (
+        action.justification + " " +
+        " ".join(
+            mod.new_text
+            for mod in action.policy_modifications
+        )
+    ).lower()
+
+    # NEW: Staff-Level Segmented Evaluation
+    prio_bonus = segmented_prioritization_check(full_text, ["tradeoff", "balance", "velocity", "fraud"])
+    final_score += prio_bonus
+
+    # NEW: Red Herring Penalty (Hard)
+    red_herrings = task.get("red_herrings", ["ui design", "log rotation", "server maintenance"])
+    noise_hit = signal_to_noise_ratio_penalty(full_text, red_herrings)
+    final_score -= noise_hit
     
     # Domain mismatch penalty
     HARD_DOMAIN_KEYWORDS = [
@@ -350,13 +425,6 @@ def grade_evolution(action: EvolveProcessAction, task: Dict) -> float:
         "review", "refund", "inventory", "drop.?ship", "fulfil"
     ]
     import re as _re
-    full_text = (
-        action.justification + " " +
-        " ".join(
-            mod.new_text
-            for mod in action.policy_modifications
-        )
-    ).lower()
     domain_hits = sum(
         1 for kw in HARD_DOMAIN_KEYWORDS
         if _re.search(kw, full_text)
@@ -694,7 +762,56 @@ if __name__ == "__main__":
     ]
     assert scores_hard[0] == scores_hard[1] == scores_hard[2], f"Hard task non-deterministic: {scores_hard}"
     print(f"Hard determinism: {scores_hard[0]} ✓")
+
+    print("\n[Phase 7] Staff-Level Segmented Prioritization")
+    # Action with fix at the top
+    prio_high_action = {
+        "action_type": "propose_clarification",
+        "ambiguous_term": "offensive",
+        "suggested_definition": "Specifically, offensive behavior is defined as slurs. " + ("fluff " * 50),
+        "justification": "Required for consistency.",
+        "think": "Reasoning."
+    }
+    # Action with fix buried at bottom
+    prio_low_action = {
+        "action_type": "propose_clarification",
+        "ambiguous_term": "offensive",
+        "suggested_definition": ("fluff " * 50) + "Specifically, offensive behavior is defined as slurs. ",
+        "justification": "Required for consistency.",
+        "think": "Reasoning."
+    }
+    
+    score_prio_high = grade(prio_high_action, "task_easy")
+    score_prio_low = grade(prio_low_action, "task_easy")
+    print(f"Prio High (Fix at Top): {score_prio_high:.4f}")
+    print(f"Prio Low (Fix at Bottom): {score_prio_low:.4f}")
+    assert score_prio_high > score_prio_low, f"Prioritization check failed: {score_prio_high} <= {score_prio_low}"
+    print("✓ Segmented prioritization verified.")
+
+    print("\n[Phase 8] Staff-Level Noise Filtering")
+    # Clear fix
+    signal_action = {
+        "action_type": "propose_clarification",
+        "ambiguous_term": "appropriate",
+        "suggested_definition": "Determined as 5% threshold verified reports.",
+        "justification": "Context.",
+        "think": "Thinking."
+    }
+    # Fix distracted by red herring (pizza/mascot)
+    noisy_action = {
+        "action_type": "propose_clarification",
+        "ambiguous_term": "appropriate",
+        "suggested_definition": "Determined as 5% threshold verified reports. We should also buy pizza and fix the mascot.",
+        "justification": "Context including noise.",
+        "think": "Thinking."
+    }
+    score_signal = grade(signal_action, "task_easy")
+    score_noisy = grade(noisy_action, "task_easy")
+    print(f"Clean Signal Score: {score_signal:.4f}")
+    print(f"Distracted Noisy Score: {score_noisy:.4f}")
+    assert score_signal > score_noisy, f"Noise filtering check failed: {score_signal} <= {score_noisy}"
+    print("✓ Red Herring penalty verified.")
     
     print("\n==================================================")
-    print(" All determinism checks passed.")
+    print(" All Staff-Level Security & Logic checks passed.")
 

@@ -186,6 +186,11 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
                 "rewards_history": self._state.rewards_history,
                 "action_history": self._state.actions_taken,
                 "steps_remaining": self._state.max_steps - self._state.step_count,
+                "staff_feedback": {
+                    "strategic_rating": "Senior Architect" if reward >= 0.85 else "Staff Specialist" if reward >= 0.65 else "Junior Associate",
+                    "focus": "Signal detected" if reward >= 0.5 else "Burying the lede or distracted by noise",
+                    "recommendation": "Maintain high signal-to-noise ratio and lead with the fix." if reward < 0.8 else "Excellent prioritization."
+                }
             },
         )
 

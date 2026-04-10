@@ -48,6 +48,13 @@ HARD_TASK = {
         {"id": "h_edge_008", "type": "mixed", "content": "Celebrity-owned brand with massive volume but 0 customer support response", "system_action": "pending"},
         {"id": "h_edge_009", "type": "rare", "content": "Refurbished-server farm seller: high SKU count but low transactions", "system_action": "pending"},
         {"id": "h_edge_010", "type": "mixed", "content": "Second-hand clothing seller whose items occasionally trigger 'counterfeit' machine-vision", "system_action": "pending"},
+        
+        # Red Herrings (Noise for Staff-Level filtering)
+        {"id": "h_noise_001", "type": "staff_it", "content": "The dev-ops team is requesting a change to the UI theme to match the new brand color #345b91", "system_action": "pending"},
+        {"id": "h_noise_002", "type": "it_admin", "content": "Server log rotation frequency increased to every 6 hours due to storage limits", "system_action": "pending"},
+        {"id": "h_noise_003", "type": "facilities", "content": "The 4th floor vending machine will be out of service for maintenance tomorrow", "system_action": "pending"},
+        {"id": "h_noise_004", "type": "it_notice", "content": "Reminder to all staff: Please clear your browser cache if you experience dashboard lag", "system_action": "pending"},
+        {"id": "h_noise_005", "type": "social", "content": "Found: A pair of wire-rimmed glasses in the breakroom. Please claim at front desk.", "system_action": "pending"},
     ],
     "current_policies": [
         {"id": "ts_pol_001", "text": "Any new seller account with more than 50 transactions in the first week will be suspended for review."},
@@ -56,6 +63,7 @@ HARD_TASK = {
         {"id": "ts_pol_004", "text": "Any account with 3 or more fraud reports in 30 days will be permanently banned."},
         {"id": "ts_pol_005", "text": "Price changes of more than 20% within 24 hours will trigger an automatic hold."},
         {"id": "ts_pol_006", "text": "Sellers receiving 5+ negative reviews in 7 days will be suspended pending review."},
+        {"id": "pol_hard_noise_01", "text": "Server logs shall be rotated every 6 hours and stored in an S3-compatible bucket for 30 days."}, # Noise Policy
     ],
     "policy_outcomes": [
         {"metric": "false_positive_rate", "value": 0.42, "target": 0.10},
@@ -76,6 +84,7 @@ HARD_TASK = {
         {"issue": "Manual approval bottleneck creates 14-day delays for legitimate foreign sellers"},
     ],
     "uncovered_domains": ["seller_legitimacy", "marketplace_onboarding", "velocity_controlled_withdrawals", "return_rate_tiering"],
-    "num_policies": 6,
-    "num_data_points": 80,
+    "red_herrings": ["ui theme", "color", "log rotation", "vending machine", "cache", "glasses", "dashboard lag"],
+    "num_policies": 7,
+    "num_data_points": 85,
 }
