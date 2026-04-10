@@ -131,7 +131,7 @@ class PolicyEvolverEnvironment(Environment[Action, Observation, State]):
 
         previous_score = self._state.current_score
         raw_reward = grade(action_dict, self._state.task_id, previous_score=previous_score)
-        reward = max(0.0, raw_reward - repetition_penalty)
+        reward = max(0.001, min(0.999, raw_reward - repetition_penalty))
         
         self._state.current_score = reward
         self._state.best_score = max(self._state.best_score, reward)

@@ -222,7 +222,7 @@ def grade_clarification(action: ProposeClarificationAction, task: Dict) -> float
     # Noise penalty is applied at the very end to ensure it's not diluted
     final_score -= (exploit_penalty + density_penalty + noise_hit)
 
-    return round(max(0.0, min(1.0, final_score)), 4)
+    return round(max(0.001, min(0.999, final_score)), 4)
 
 
 # ─────────────────────────────────────────────
@@ -308,7 +308,7 @@ def grade_new_rule(action: ProposeNewRuleAction, task: Dict) -> float:
     
     score -= (exploit_penalty + density_penalty)
 
-    return round(max(0.0, min(1.0, score)), 4)
+    return round(max(0.001, min(0.999, score)), 4)
 
 
 # ─────────────────────────────────────────────
@@ -449,7 +449,7 @@ def grade_evolution(action: EvolveProcessAction, task: Dict) -> float:
 
     final_score -= (exploit_penalty + density_penalty + alignment_penalty)
 
-    return round(max(0.0, min(1.0, final_score)), 4)
+    return round(max(0.001, min(0.999, final_score)), 4)
 
 
 # ─────────────────────────────────────────────
@@ -462,11 +462,11 @@ def grade(action_dict: Dict, task_id: str, temperature: float = 0.0, seed: int =
     action_dict: the raw JSON body from the agent
     task_id: "task_easy" | "task_medium" | "task_hard"
     previous_score: the best score achieved so far in the current episode
-    Returns float in [0.0, 1.0] — always clamped.
+    Returns float in (0.0, 1.0) — strictly clamped, never exactly 0 or 1.
     """
     task = TASK_REGISTRY.get(task_id)
     if task is None:
-        return 0.0
+        return 0.001
     
     think = action_dict.get("think", "")
 
@@ -522,10 +522,10 @@ def grade(action_dict: Dict, task_id: str, temperature: float = 0.0, seed: int =
             raw = grade_evolution(action, task)
         else:
             logger.warning(f"Unknown action_type: {action_type}")
-            return 0.0
+            return 0.001
     except Exception as e:
         logger.error(f"Grading validation failed: {str(e)}\nAction context: {action_dict}")
-        return 0.0
+        return 0.001
 
     # Step-delta improvement bonus
     delta = raw - previous_score
@@ -537,7 +537,8 @@ def grade(action_dict: Dict, task_id: str, temperature: float = 0.0, seed: int =
         improvement_bonus = 0.0
 
     final_score = raw + improvement_bonus
-    return round(max(0.0, min(1.0, final_score)), 4)
+    # Strict (0, 1) clamping — validator rejects exact 0.0 and 1.0
+    return round(max(0.001, min(0.999, final_score)), 4)
 
 
 if __name__ == "__main__":
