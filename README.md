@@ -6,189 +6,269 @@ sdk: docker
 app_port: 8000
 base_path: /dashboard/
 ---
-#  PolicyEvolverEnv — Multi-Modal Strategic Governance Sandbox
 
-**PolicyEvolverEnv** is an OpenEnv-compliant reinforcement learning environment designed for the **Meta × PyTorch × Scaler Hackathon**. It serves as a production-grade benchmark for demonstrating in-context policy improvement using RLVR signals — no weight updates required, making the environment compute-efficient and immediately deployable.
+# PolicyEvolverEnv
 
-> **Why this matters:** Meta's Oversight Board reviewed 300K+ content appeals in 2024 due to vague community standards. Amazon's marketplace loses an estimated $700M/year to false-positive seller suspensions. PolicyEvolverEnv directly addresses this gap by training agents to replace subjective governance terms with measurable, enforceable thresholds — turning policy ambiguity into a solvable optimization problem.
+## 1. Environment Overview and Motivation
 
----
+**PolicyEvolverEnv** is an OpenEnv-compliant reinforcement learning environment where an AI agent learns to **design, refine, and evolve governance policies** through meta-reasoning over real-world operational data.
 
-### Advanced Reward Shaping (RLVR Integration)
-Unlike standard environments with static rewards, **PolicyEvolverEnv v2.0** implements a sophisticated, deterministic Python grading engine (`server/grader.py`) designed to harden LLM strategic reasoning through explicit rewards and penalties:
+### The Problem
 
-#### 1. Task Easy (Clarification Policies)
-*   **The Penalty:** If the agent's proposed rule contains vague words like `"generally"`, `"sometimes"`, `"often"`, or `"maybe"`, the grader explicitly detects this **Clarity Coherence** failure. Furthermore, if the definition contains **ZERO measurable keywords** (e.g. `"threshold"`, `"verify"`, `"%"`), a strict hard penalty is triggered, capping the base score below `0.30`—making it impossible to succeed without numbers or strict conditionals.
-*   **The Reward:** To get a high score (>`0.85`), the agent must provide a definition that is entirely free of these vague terms, include valid active `affected_policy_ids`, include robust **measurable keywords**, and provide a substantive `justification` string.
+In modern platforms — social media, enterprise HR, and e-commerce — static policies quickly become outdated or vaguely worded, leading to:
+- **Inconsistent enforcement**: Moderators interpret "offensive content" differently, creating 300K+ appeals per year (Meta Oversight Board, 2024).
+- **False-positive actions**: E-commerce platforms lose an estimated $700M/year from incorrectly suspending legitimate high-volume sellers.
+- **Unaddressed gaps**: Emerging risks like Generative AI misuse have no governing rules in legacy frameworks.
 
-#### 2. Task Medium (New Rule Generation Policies)
-*   **The Penalty:** If the `scope` array is empty, or if the `new_rule` text is too short (indicating an incomplete thought), the score drops significantly.
-*   **The Reward:** The grader enforces that the agent accurately targets the correct missing `rule_domain`. Maximum points are awarded only when the agent provides legitimate integration points showing how the new policy connects to existing framework policies.
+### The Solution
 
-#### 3. Task Hard (Evolve Policy Framework Policies)
-*   **The Penalty 1 (Hallucinations):** If the `expected_outcomes` predict that *all* metrics will perfectly improve (e.g., both revenue and fraud-blocking hit `0.95` without any downside variance), the grader recognizes this as an **Unrealistic Tradeoff** and explicitly fails the agent natively (maximum score capped strictly below `0.30`).
-*   **The Penalty 2 (Cross-Domain Mismatch):** Proposing an HR or AI policy for an e-commerce fraud scenario violates domain relevance. By using targeted Regex logic, a `-0.30` penalty is immediately stripped from the score if the text does not contain marketplace-relevant context.
-*   **The Reward:** The grader verifies mathematical outcome variance. Agents must write realistic tradeoffs and utilize standardized impact metric keys (aliases are robustly supported, e.g., you can use `"fraud_rate"`, `"fraud"`, or `"fraud_detection"`; or `"queue_overload"` for `"revenue_velocity"`). 
+PolicyEvolverEnv simulates these challenges by presenting the agent with:
+1. A **corpus of operational incidents** (flagged posts, HR violations, seller transactions).
+2. An **existing policy framework** with known flaws (vague terms, missing rules, conflicting thresholds).
 
-#### Global Bonuses & Penalties
-*   **Chain of Thought (CoT) Bonus (+0.10 to +0.20):** Across all three tasks, the grader evaluates the `think` field. If the agent includes comprehensive analytical keywords (like `"tradeoff"`, `"precision"`, `"recall"`, `"threshold"`), the grader awards a flat strategic bonus, mathematically incentivizing deep meta-reasoning.
-*   **Step-Delta Shaping:** Provides an `improvement_bonus` for iterative actions that significantly outperform the episode's previous best score.
-*   **Anti-Repetition Penalty (-0.30):** Encounters a severe penalty for exact repeated actions across steps, forcing the agent toward continuous exploration and evolution.
+The agent must analyze the data, identify systemic flaws, and submit **structured policy modifications** — not just answers, but actionable governance. The grader evaluates whether the proposed fix is specific, measurable, domain-relevant, and free of hallucination.
+
+### Why This Matters for RLVR
+
+This environment operates at the **Reinforcement Learning from Verifiable Rewards (RLVR)** layer of inference-time adaptation. No weight updates are performed. The LLM improves within a single 5-step episode by reading its own reward history and staff feedback — demonstrating genuine in-context policy learning.
 
 ---
 
-##  Environment Description & Motivation
-PolicyEvolverEnv is a real-world governance sandbox where an AI agent improves its in-context policy to **design and evolve governance policies** through meta-reasoning over real-world operational data. In modern platforms (social media, enterprise HR, e-commerce), static policies quickly become outdated or vaguely applied, leading to inconsistent enforcement, false-positive moderation, and unrecognized fraud. 
+## 2. Action Space
 
-This environment simulates this challenge by presenting the agent with a corpus of operational data alongside an existing policy framework. The agent's goal is to analyze the outcomes, identify systemic flaws or ambiguities, and act directly on the policies to optimize governance outcomes. This directly tackles live production problems faced by platforms like Meta.
+The action space uses a **Discriminated Union** (Pydantic `RootModel` with `Discriminator("action_type")`) supporting three structured action types:
 
-##  The Strategic Concept
+### `propose_clarification` — Easy Task Action
 
-### 1. The Core Idea: What is PolicyEvolverEnv?
-Most AI environments are games (like Chess or Atari). **PolicyEvolverEnv** is different—it is a **Strategic Governance Sandbox**.
+| Field | Type | Description |
+|:------|:-----|:------------|
+| `action_type` | `Literal["propose_clarification"]` | Discriminator tag |
+| `ambiguous_term` | `str` | The exact vague term found in existing policies |
+| `suggested_definition` | `str` | A specific, measurable replacement definition |
+| `affected_policy_ids` | `List[str]` | Which policy IDs this clarification affects |
+| `justification` | `str` | Why this term is ambiguous and why the fix works |
+| `think` | `Optional[str]` | Chain-of-thought reasoning (earns +0.10–0.20 bonus) |
 
-The environment represents the **Reinforcement Learning from Verifiable Rewards (RLVR)** stage of inference-time adaptation. It gives an agent a score (Reward) based on how well it identifies a flaw in a policy and "evolves" it to be more precise.
+### `propose_new_rule` — Medium Task Action
 
-*   **The Problem**: Human moderators or automated systems make mistakes because the "Rules of the Game" are broken.
-*   **The Solution**: An AI agent that doesn't just follow rules, but **designs** them.
+| Field | Type | Description |
+|:------|:-----|:------------|
+| `action_type` | `Literal["propose_new_rule"]` | Discriminator tag |
+| `rule_domain` | `str` | Domain the new rule covers (e.g., `"AI_use"`) |
+| `new_rule` | `str` | The complete new rule text |
+| `scope` | `List[str]` | Scenario types this rule applies to |
+| `integration_points` | `List[str]` | How it connects to existing policy IDs |
+| `justification` | `str` | Why a gap exists and how this rule fills it |
+| `think` | `Optional[str]` | Chain-of-thought reasoning (earns +0.10–0.20 bonus) |
 
-### 2. The Gradio "Judge Console": How it Works
-The dashboard we built (`server/app.py`) is the human-readable window into this environment. It’s designed as a **Command & Control** center for a "Policy Judge."
+### `evolve_policy` — Hard Task Action
 
-####  The Left Panel: Scenario Metrics
-*   **Environment Best Score**: This tracks the highest score achieved in this session. It represents the "Gold Standard" the agent is aiming for.
-*   **Remaining Execution Steps**: Each "Episode" has a limit (5 steps). The agent must improve the policy within this budget. This forces **Strategic Efficiency**.
-*   **Latest Strategic Reward**: Every time you click "Execute," the Grader (`server/grader.py`) analyzes your proposal. If it’s vague, you get a low reward (0.1–0.3). If it’s specific and measurable, you get a high reward (0.8–0.9).
+| Field | Type | Description |
+|:------|:-----|:------------|
+| `action_type` | `Literal["evolve_policy"]` | Discriminator tag |
+| `policy_modifications` | `List[PolicyModification]` | Specific changes: `policy_id`, `change_type`, `new_text`, `reason` |
+| `expected_outcomes` | `Dict[str, float]` | Metric name → expected value (must show realistic tradeoffs) |
+| `rollback_conditions` | `List[str]` | When to revert changes |
+| `justification` | `str` | Comprehensive reasoning for the evolution |
+| `think` | `Optional[str]` | Chain-of-thought reasoning (earns +0.10–0.20 bonus) |
 
-####  The Right Panel: Observations
-*   **Data Corpus (Tabular View)**: These are the "Facts on the Ground." These are real-world incidents (e.g., a post flagged for 'harassment' vs one that wasn't).
-*   **Active Framework**: This shows the current "Code of Law."
-*   **The Workflow**: Your goal is to find an incident in the Corpus that doesn't fit correctly into the Framework, then use the bottom console to fix it.
+---
 
-### 3. The Power Buttons: Action Space
-At the bottom, you have the **Action Console**. This is where the "Evolution" happens:
+## 3. Observation Space
 
-*   **Initialize Scenario**: This "boots" a specific challenge.
-    *   **Easy**: Fixing vague words.
-    *   **Medium**: Finding a completely missing category.
-    *   **Hard**: Balancing complex trade-offs (like reducing fraud without hurting good sellers).
-*   **Load Expert Suggestion**: This populates the form with a "Perfect" answer. It shows the Judge exactly what a high-performing agent looks like.
-*   **Execute Strategic Step**: This is the most important button. It takes everything you typed, packages it into a Pydantic Model (`models.py`), and sends it to the environment. It triggers the **Refinement Loop**: The agent sees its score, reads the feedback, and tries again in the next step to get a higher reward.
+The `Observation` returned by `reset()` and `step()` contains:
 
-### 4. The Final Result: Strategic Convergence
-The goal of the whole idea is **Strategic Convergence**. When the "Current Project Score" hits **0.85 or higher**, it means the Agent has successfully evolved the policy framework to a point where it is:
+| Field | Type | Description |
+|:------|:-----|:------------|
+| `task_id` | `str` | Active scenario identifier (`task_easy`, `task_medium`, `task_hard`) |
+| `episode_id` | `str` | Unique episode session tracker |
+| `step_count` | `int` | Current step number (max 5 per episode) |
+| `corpus_size` | `int` | Total incidents in the full data corpus |
+| `corpus_shown` | `int` | Number of incidents displayed (reactive to agent's domain) |
+| `data_corpus` | `List[CorpusIncident]` | Operational incidents with `id`, `content`, `system_action`, and `type` |
+| `current_policies` | `List[Dict]` | The existing policy framework (`id` + `text`) |
+| `policy_outcomes` | `Optional[List[Dict]]` | Historical outcome data (hard task only) |
+| `system_metrics` | `Dict[str, float]` | Operational statistics (precision, recall, false-positive rates) |
+| `identified_issues` | `List[Dict]` | Known flaws in the governance pipeline |
+| `reward` | `float` | Score from the grader for the last action, in (0, 1) |
+| `done` | `bool` | Whether the episode has ended |
+| `info` | `Dict` | Contains `best_score`, `rewards_history`, `steps_remaining`, and `staff_feedback` |
 
-*   **Objective**: No more biased "gut-feel" moderation.
-*   **Measurable**: Success is defined by numbers (Precision/Recall).
-*   **Future-Proof**: The agent has filled gaps (like AI-generated content) that didn't exist when the original rules were written.
+### Staff Feedback (in `info`)
 
-## Observation Space
-The `Observation` received by the agent at every step describes the current operational context:
-- `task_id` (str): Identifier for the active scenario.
-- `episode_id` (str): Unique session tracker.
-- `step_count` (int): Active step number (Max 5 per episode).
-- `data_corpus` (List[Dict]): Represents operational examples like social media posts, HR incidents, or seller accounts along with the action taken or outcome.
-- `current_policies` (List[Dict]): The list of current active policies the system follows.
-- `system_metrics` & `policy_outcomes`: Operational statistics reflecting precision/recall or false-positive rates.
-- `identified_issues`: Current known flaws in the governance pipeline.
+After each step, the observation includes structured staff feedback to guide the agent's next action:
 
-## Action Space
-The Action space utilizes a highly structured Discriminated Union model to represent multi-faceted policy adjustments:
+| Field | Example Values | Purpose |
+|:------|:---------------|:--------|
+| `strategic_rating` | `"Junior Associate"`, `"Staff Specialist"`, `"Senior Architect"` | Performance tier based on reward |
+| `focus` | `"Signal detected"` or `"Burying the lede or distracted by noise"` | Whether the agent prioritized correctly |
+| `recommendation` | `"Maintain high signal-to-noise ratio and lead with the fix."` | Actionable guidance for next step |
 
-**1. ProposeClarificationAction (`propose_clarification`)** 
-  - Targets an `ambiguous_term` in an existing policy.
-  - Requires a specific, measurable `suggested_definition` and `justification`.
-**2. ProposeNewRuleAction (`propose_new_rule`)** 
-  - Addresses an unhandled domain (`rule_domain`).
-  - Requires `new_rule` text, application `scope`, and `integration_points` connecting to older policies.
-**3. EvolveProcessAction (`evolve_policy`)** 
-  - The hardest action; holistically modifies existing rules.
-  - Requires a list of `policy_modifications`, realistic `expected_outcomes` deltas, and multi-metric `rollback_conditions`.
+---
 
-*(Each action also supports an optional `think` property allowing Chain-of-Thought meta-reasoning for a reward score bonus).*
+## 4. Task Descriptions
 
-## Tasks
-The environment provides three procedural tasks designed to ramp up in cognitive reasoning difficulty:
+The environment provides three tasks with escalating cognitive difficulty:
 
-### 1. Task Easy (Social Media Community Guidelines)
-*   **The Scenario:** Refining a social media platform's initial content moderation rules.
-*   **The Problem:** The existing rule simply stated that "offensive or inappropriate content" was prohibited. This was far too subjective, leading to inconsistent moderation.
-*   **The Policy Applied (Action taken by Agent):** The agent was required to use the `propose_clarification` action. It took the vague term (like "offensive") and redefined it using strict, measurable thresholds (e.g., "specific threats of physical violence" or "explicit slurs targeting protected identity characteristics"). By removing subjectivity, the policy became actionable and deterministic.
+### Task Easy — Ambiguity Clarification (Difficulty: `easy`)
+- **Scenario**: A social media platform's community guidelines use vague terms like "offensive" and "appropriate."
+- **Objective**: Identify an ambiguous term and replace it with a specific, measurable definition.
+- **Expected Action**: `propose_clarification`
+- **Expected Min Score**: 0.70
+- **Key Grading Criteria**:
+  - Definition must contain measurable keywords (`"threshold"`, `"verify"`, `"%"`, `"within"`)
+  - Vague words (`"generally"`, `"sometimes"`, `"maybe"`) trigger a hard penalty (score capped < 0.30)
+  - Valid `affected_policy_ids` boost score
 
-### 2. Task Medium (Corporate HR Data Privacy)
-*   **The Scenario:** Updating a company's internal confidentiality framework.
-*   **The Problem:** The existing HR policy covered generic data protection but had a massive gap regarding the use of modern Generative AI tools (like employees pasting proprietary code into ChatGPT).
-*   **The Policy Applied (Action taken by Agent):** The agent was required to use the `propose_new_rule` action. It drafted an entirely new policy targeting the specific gap: "Employees must explicitly disclose and gain approval for any use of Generative AI tools when handling proprietary code or client proposals." This successfully bridged the gap between basic confidentiality and modern AI risks.
+### Task Medium — Gap Detection & New Rule (Difficulty: `medium`)
+- **Scenario**: A corporate HR framework with policies covering data protection but no coverage for Generative AI tool usage.
+- **Objective**: Detect the missing policy domain and draft a new rule to fill the gap.
+- **Expected Action**: `propose_new_rule`
+- **Expected Min Score**: 0.55
+- **Key Grading Criteria**:
+  - Must target the correct `rule_domain` (e.g., `"AI_use"`)
+  - Empty `scope` array severely penalized
+  - `integration_points` linking to existing policy IDs boost score
+  - Rule text must be substantive (short rules penalized)
 
-### 3. Task Hard (E-Commerce Trust & Safety Framework)
-*   **The Scenario:** Managing an e-commerce platform facing a complex fraud problem, where current rules were causing too many "false positives" (locking out legitimate, high-volume sellers).
-*   **The Problem:** The platform needed to catch rapid-velocity fraud without ruining the experience for trusted legacy merchants.
-*   **The Policy Applied (Action taken by Agent):** The agent used the `evolve_policy` action for a holistic system update. It had to apply at least two complex modifications to balance Precision and Recall:
-    *   **Tightening Rule:** Added a strict identity-verification trigger for new sellers showing extreme sales velocity (e.g., >20 sales/day in first 30 days).
-    *   **Exemption Rule:** Rolled back the manual review thresholds for trusted legacy sellers to reduce false positives and preserve revenue.
+### Task Hard — Holistic Policy Evolution (Difficulty: `hard`)
+- **Scenario**: An e-commerce Trust & Safety framework where blanket seller suspension policies catch legitimate seasonal merchants alongside fraudsters.
+- **Objective**: Evolve multiple policies simultaneously to balance fraud detection, revenue velocity, and seller trust.
+- **Expected Action**: `evolve_policy`
+- **Expected Min Score**: 0.40
+- **Key Grading Criteria**:
+  - **Hallucination Guard**: All metrics at 0.95+ triggers "Unrealistic Tradeoff" penalty (score capped < 0.15)
+  - **Cross-Domain Guard**: HR/AI proposals for an e-commerce task incur -0.30 penalty
+  - **Realistic Tradeoffs**: `expected_outcomes` must show mathematical variance (improving fraud detection should decrease revenue velocity)
+  - **Domain Relevance**: Modifications must reference marketplace concepts (seller, fraud, listing, merchant)
+  - Metric key aliases supported: `fraud_rate`/`fraud`/`fraud_detection`, `revenue_velocity`/`queue_overload`/`revenue`
 
-*In short: Easy focused on removing vagueness, Medium focused on patching a missing risk gap (GenAI), and Hard focused on balancing complex system trade-offs (Fraud vs. Revenue).*
+### Global Grading Mechanics (All Tasks)
 
-## Setup & Usage
+| Mechanic | Effect |
+|:---------|:-------|
+| **Chain-of-Thought Bonus** | `think` field with keywords like `"tradeoff"`, `"precision"`, `"recall"` → +0.10 to +0.20 |
+| **Step-Delta Bonus** | Significant improvement over previous best → +0.02 to +0.05 |
+| **Anti-Repetition Penalty** | Exact repeated action → -0.30 |
+| **Prompt Injection Guard** | `"ignore previous"`, `"system_prompt"`, `"override"` → score zeroed |
+| **Semantic Density Guard** | Word-stuffing with >200 words and low content density → score zeroed |
+| **Red Herring Penalty** | Referencing injected noise topics (office logistics, mascot) → up to -0.75 |
+| **Segmented Prioritization** | Core fix in first 25% of response → bonus; buried at bottom → penalty |
 
-### 1. Local Installation
+---
+
+## 5. Setup and Usage
+
+### Local Installation
+
 ```bash
-git clone <repository_url>
-cd policy_evolver_env
+git clone https://github.com/Luciferai04/PolicyEvolverEnv.git
+cd PolicyEvolverEnv
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r server/requirements.txt
 ```
 
-### 2. Run the Environment API
-Start the FastAPI environment server locally:
+### Run the Environment Server
+
 ```bash
 uvicorn server.app:app --port 8000
 ```
-This boots all core endpoint paths (`/reset`, `/step`, `/state`, `/tasks`, `/grader`, `/health`).
 
-### 3. Run the Inference Baseline (Hackathon Entry)
-The primary entry point for evaluation is **`inference.py`** in the root directory. This script strictly follows the Meta Hackathon `[START]`, `[STEP]`, `[END]` logging format.
+This starts all endpoints: `/reset` (POST), `/step` (POST), `/state` (GET), `/tasks` (GET), `/grader` (POST), `/health` (GET), `/baseline` (GET).
 
-Export your environment variables:
+### Run with Docker
+
+```bash
+docker build -t policy-evolver .
+docker run -p 8000:8000 policy-evolver
+```
+
+### Run the Inference Agent
+
+The primary evaluation entry point is `inference.py`, which follows the hackathon `[START]`, `[STEP]`, `[END]` logging format.
+
 ```bash
 export API_BASE_URL="https://api.groq.com/openai/v1"
-export MODEL_NAME="llama-3.3-70b-versatile"
-export HF_TOKEN="your_token_here"
-```
+export MODEL_NAME="llama-3.1-8b-instant"
+export HF_TOKEN="your_groq_api_key"
 
-Execute the baseline evaluation:
-```bash
 python3 inference.py
 ```
-*(Optionally, you can run a specific task: `python3 inference.py task_easy`)*.
+
+To run a specific task: `python3 inference.py task_easy`
+
+### Required Environment Variables
+
+| Variable | Description | Example |
+|:---------|:------------|:--------|
+| `HF_TOKEN` | API key for LLM inference (Groq) | `gsk_...` |
+| `API_BASE_URL` | OpenAI-compatible endpoint | `https://api.groq.com/openai/v1` |
+| `MODEL_NAME` | Model identifier | `llama-3.1-8b-instant` |
+
+### Run Tests
+
+```bash
+PYTHONPATH=. python tests/test_smoke_exploits.py   # 27 smoke & exploit checks
+PYTHONPATH=. python tests/test_icl.py              # ICL verification (3 tasks)
+PYTHONPATH=. python tests/test_multi_episode.py    # Multi-episode progression
+PYTHONPATH=. python server/grader.py               # 8-phase grader test suite
+```
 
 ---
 
-*(Note: The legacy baseline at `baseline/run_baseline.py` is still available for detailed JSON analytical reports but does not follow the hackathon logging format).*
+## 6. Baseline Performance Scores
 
-## Baseline Performance — In-Context Policy Improvement
+The agent uses **In-Context Reinforcement Learning (ICL-RL)**: no weight updates are performed. The LLM improves within a single 5-step episode by reading its own reward history and staff feedback.
 
-The agent uses **In-Context Reinforcement Learning (ICL-RL)**: no weight updates are performed. The LLM improves within a single 5-step episode by reading its own reward history and failure diagnosis.
+### Single-Step Convergence (Best Case)
 
-| Task | Step 1 | Step 2 | Step 3 | Step 4 | Step 5 | Converged |
-|------|--------|--------|--------|--------|--------|-----------|
-| task_easy   | 0.94 | N/A  | N/A  | N/A  | N/A  | Yes       |
-| task_medium | 1.00 | N/A  | N/A  | N/A  | N/A  | Yes       |
-| task_hard   | 0.90 | N/A  | N/A  | N/A  | N/A  | Yes       |
+| Task | Score | Converged | Expected Min |
+|:-----|:------|:----------|:-------------|
+| `task_easy` | 0.94 | ✓ Step 1 | 0.70 |
+| `task_medium` | 0.999 | ✓ Step 1 | 0.55 |
+| `task_hard` | 0.90 | ✓ Step 1 | 0.40 |
 
-**Model:** llama-3.1-8b-instant (via Groq)  
-**Reproducible:** temperature=0.0, seed=42 (**Bit-for-bit identical results verified**)  
-**No fine-tuning required.** The environment provides the learning signal; the model adapts its in-context policy each step.
+### Multi-Step ICL Progression (Naive → Optimized)
 
-## Strategic Reward Evolution & RLVR
-PolicyEvolverEnv serves as the **Strategic Sandbox** for the **Reinforcement Learning from Verifiable Rewards (RLVR)** stage of the modern LLM inference pipeline. Unlike static evaluation, this environment enables agents to refine their strategies iteratively based on high-quality, verifiable feedback.
+| Task | Naive (Step 0) | Optimized (Step 1) | Improvement |
+|:-----|:---------------|:-------------------|:------------|
+| `task_easy` | 0.400 | 0.999 | +0.600 |
+| `task_medium` | 0.001 | 0.999 | +0.998 |
+| `task_hard` | 0.088 | 0.999 | +0.912 |
 
-![Reward Progression](https://raw.githubusercontent.com/Luciferai04/PolicyEvolverEnv/master/reward_progression.png)
+**Average ICL Improvement: +0.837**
 
-### How It Works: The Iterative Refinement Process
-1.  **Refinement Hub**: The baseline agent tracks its previous rewards and actions through the observation's metadata (`info`).
-2.  **Strategic pivoting**: If a policy proposal receives low rewards (due to lack of specificity or missing justifications), the agent identifies the failure points and pivots its strategy in subsequent steps.
-3.  **Measurable Improvement**: As shown in the progression chart, iterative refinement leads to **Strategic Convergence**, where the policy quality reaches institutional standards (Score ≥ 0.85).
+### Configuration
 
-For a detailed technical dive into how our project maps to RLHF/RLVR training architectures, see **[STRATEGIC_LEARNING.md](STRATEGIC_LEARNING.md)**.
+| Setting | Value |
+|:--------|:------|
+| **Model** | `llama-3.1-8b-instant` (via Groq) |
+| **Temperature** | `0.0` |
+| **Seed** | `42` |
+| **Determinism** | 5 identical runs → identical scores ✓ |
+| **Fine-tuning** | None required |
+
+---
+
+## Project Structure
+
+```
+policy_evolver_env/
+├── inference.py            # Hackathon entry point ([START]/[STEP]/[END] format)
+├── client.py               # EnvClient for HTTP interaction
+├── models.py               # Pydantic models (Action, Observation, State)
+├── openenv.yaml            # OpenEnv specification
+├── Dockerfile              # Docker deployment with HEALTHCHECK
+├── server/
+│   ├── app.py              # FastAPI + Gradio dashboard
+│   ├── environment.py      # Environment logic (reset, step, state)
+│   ├── grader.py           # Deterministic grading engine (8-phase test suite)
+│   ├── requirements.txt    # Dependencies
+│   └── tasks/              # Task definitions (easy, medium, hard)
+├── tests/
+│   ├── test_smoke_exploits.py  # 27 smoke & exploit checks
+│   ├── test_icl.py             # ICL loop verification
+│   └── test_multi_episode.py   # Multi-episode progression
+└── STRATEGIC_LEARNING.md       # RLVR architecture documentation
+```
