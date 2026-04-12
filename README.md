@@ -31,7 +31,27 @@ The agent must analyze the data, identify systemic flaws, and submit **structure
 ### Why This Matters for RLVR
 
 This environment operates at the **Reinforcement Learning from Verifiable Rewards (RLVR)** layer of inference-time adaptation. No weight updates are performed. The LLM improves within a single 5-step episode by reading its own reward history and staff feedback — demonstrating genuine in-context policy learning.
+1. The Problem Before (Why we built this)
+Before this environment existed, training an AI to understand the nuances of corporate policy required massive amounts of expensive human labor. Companies (like Meta, Uber, or Amazon) have to hire thousands of human annotators to look at scenarios and write down "this is a good rule" or "this is a bad rule." This is called RLHF (Reinforcement Learning from Human Feedback), and it is:
 
+Slow: Takes months to gather feedback.
+Expensive: Costs millions of dollars to pay experts.
+Subjective: Humans disagree on what constitutes a "good" policy.
+2. The Output We Gained (After building this)
+The true "output" of the PolicyEvolverEnv is that it acts as a Synthetic Training Ground for large language models to teach themselves to be better policy experts, without human intervention.
+
+By building this environment, we gained three massive ROIs:
+
+A. Automated Strategic Alignment (RLVR)
+Instead of relying on human feedback (RLHF), we now have a system for Reinforcement Learning from Verifiable Rewards (RLVR). We can take a base model (like LLaMA-3), drop it into this environment, and let it run millions of simulated episodes. Because the grader mathematically calculates trade-offs (e.g., fraud reduction vs. revenue loss), the output is a model that has aligned its own reasoning to prioritize measurable metrics over subjective "gut feelings."
+
+B. The "Zero-Shot" Policy Consultant
+The output of running an agent through this environment is a highly optimized "In-Context Policy." The ROI here is that companies can drop their massive, outdated PDF handbooks into this system, and the AI will systematically read the rules, cross-reference them with thousands of recent moderation failures/incidents (the Corpus), and output a surgically precise, updated rulebook. The ROI is turning a 6-month legal/compliance review into a 5-minute automated optimization loop.
+
+C. Safety Against Catastrophic Edge Cases
+The environment forces the agent to deal with "Red Herrings" and hallucination traps (e.g., trying to set a rule that blocks all fraud but also blocks all good customers). The output gained here is a Safety Benchmark. Companies can use this environment to test their proprietary AI agents before deploying them into production. If an agent fails the "task_hard" in this environment, you know it is not safe to trust it with live corporate governance yet.
+
+"Before PolicyEvolverEnv, aligning an AI to handle complex corporate governance required expensive, slow human feedback (RLHF). The output we gain by building this environment is a standardized RLVR (Reinforcement Learning from Verifiable Rewards) sandbox: we can now automatically train and evaluate AI models to balance complex real-world trade-offs—like catching fraud without hurting revenue—creating a cheaper, faster, and mathematically objective zero-shot policy consultant."
 ---
 
 ## 2. Action Space
