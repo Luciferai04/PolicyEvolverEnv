@@ -5,6 +5,9 @@ import uuid
 import random
 from typing import Optional, Any, Dict
 from openenv.core.env_server import Environment
+import logging
+
+logger = logging.getLogger(__name__)
 from models import (
     Action, Observation, State,
     ProposeClarificationAction, ProposeNewRuleAction, EvolveProcessAction,
